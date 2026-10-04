@@ -15,8 +15,11 @@
 - 책상 object 배치 저장
 - Daily / Time Capsule unlock 계산
 - unlock된 public 편지 조회
+- 카카오 인가 코드 기반 로그인 및 회원 자동 가입
+- JWT access token과 회전형 refresh token
+- 로그인 회원 편지 작성 및 닉네임 fallback
 
-로그인, Claim, Owner API, 사진 Object Storage, 광고, 교실은 아직 구현하지 않았습니다. 교실은 Post-MVP 범위입니다.
+Claim, Owner API, 사진 Object Storage, 광고, 교실은 아직 구현하지 않았습니다. 교실은 Post-MVP 범위입니다.
 
 ## Tech
 
@@ -34,10 +37,15 @@ MySQL에 `chak` database를 만든 뒤 실행합니다.
 export DB_URL='jdbc:mysql://localhost:3306/chak?serverTimezone=Asia/Seoul&characterEncoding=UTF-8'
 export DB_USERNAME='root'
 export DB_PASSWORD='your-password'
+export KAKAO_CLIENT_ID='your-kakao-rest-api-key'
+export KAKAO_CLIENT_SECRET='your-client-secret-if-enabled'
+export JWT_SECRET='at-least-32-byte-production-secret'
 ./gradlew bootRun
 ```
 
 Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+
+상세 요청·응답 및 프론트 연동 규칙: [`docs/API.md`](docs/API.md)
 
 ## Test
 
@@ -82,9 +90,11 @@ POST /api/public/desks/{supporterToken}/messages
 
 ## Authentication boundary
 
-로그인 구현은 후속 단계지만 domain은 회원 연결을 고려해 설계했습니다.
-
-- 개인 책상 생성: 로그인 필수 예정
+- 카카오 로그인: `POST /api/auth/kakao`
+- 토큰 재발급: `POST /api/auth/refresh`
+- 로그아웃: `POST /api/auth/logout`
+- 내 정보: `GET /api/users/me`
+- 개인 책상 생성: 로그인 필수 예정(Owner API 후속 구현)
 - 개인 Supporter link 조회/편지 작성: 비로그인 허용
 - 회원 편지: `author_user_id` + 선택적 `nickname_override`
 - 비회원 편지: `author_guest_id` + 필수 `nickname_override`

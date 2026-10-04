@@ -1,10 +1,13 @@
 package com.likelion.chak.controller;
 
+import com.likelion.chak.config.AuthenticatedUser;
+import com.likelion.chak.domain.UserAccount;
 import com.likelion.chak.dto.GuestMessageCreateRequest;
 import com.likelion.chak.dto.GuestSession;
 import com.likelion.chak.dto.MessageResponse;
 import com.likelion.chak.dto.PublicDeskResponse;
 import com.likelion.chak.service.DeskService;
+import com.likelion.chak.service.AuthService;
 import com.likelion.chak.service.GuestIdentityService;
 import com.likelion.chak.service.MessageService;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,6 +34,7 @@ import java.util.List;
 public class PublicDeskController {
 
     private final DeskService deskService;
+    private final AuthService authService;
     private final GuestIdentityService guestIdentityService;
     private final MessageService messageService;
 
@@ -58,7 +63,14 @@ public class PublicDeskController {
     public ResponseEntity<MessageResponse> createGuestMessage(
             @PathVariable("supporterToken") String supporterToken,
             @CookieValue(name = "chak_guest_id", required = false) String guestKey,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @RequestBody GuestMessageCreateRequest request) {
+        if (authenticatedUser != null) {
+            UserAccount user = authService.getUser(authenticatedUser.userId());
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(messageService.createUserMessage(supporterToken, user, request));
+        }
+
         GuestSession guestSession = guestIdentityService.resolveOrCreate(guestKey);
         MessageResponse response = messageService.createGuestMessage(
                 supporterToken,
