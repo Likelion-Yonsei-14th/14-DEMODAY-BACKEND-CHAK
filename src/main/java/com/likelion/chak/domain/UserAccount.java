@@ -24,8 +24,17 @@ public class UserAccount {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, unique = true, updatable = false, length = 100)
+    private String kakaoId;
+
     @Column(nullable = false, length = 50)
     private String displayName;
+
+    @Column(length = 320)
+    private String email;
+
+    @Column(length = 1000)
+    private String profileImageUrl;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -33,16 +42,25 @@ public class UserAccount {
     @Column(nullable = false)
     private Instant updatedAt;
 
-    private UserAccount(String displayName) {
+    private UserAccount(String kakaoId, String displayName, String email, String profileImageUrl) {
+        this.kakaoId = kakaoId;
         this.displayName = displayName;
+        this.email = email;
+        this.profileImageUrl = profileImageUrl;
     }
 
-    public static UserAccount create(String displayName) {
-        return new UserAccount(displayName);
+    public static UserAccount createKakao(
+            String kakaoId,
+            String displayName,
+            String email,
+            String profileImageUrl) {
+        return new UserAccount(kakaoId, displayName, email, profileImageUrl);
     }
 
-    public void updateDisplayName(String displayName) {
+    public void updateKakaoProfile(String displayName, String email, String profileImageUrl) {
         this.displayName = displayName;
+        this.email = email;
+        this.profileImageUrl = profileImageUrl;
     }
 
     @PrePersist

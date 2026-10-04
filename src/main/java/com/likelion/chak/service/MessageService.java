@@ -9,6 +9,7 @@ import com.likelion.chak.domain.MessageStatus;
 import com.likelion.chak.domain.MessageVisibility;
 import com.likelion.chak.domain.PersonalDesk;
 import com.likelion.chak.domain.PersonalMessageDelivery;
+import com.likelion.chak.domain.UserAccount;
 import com.likelion.chak.dto.DeskObjectRequest;
 import com.likelion.chak.dto.GuestMessageCreateRequest;
 import com.likelion.chak.dto.MessageResponse;
@@ -47,20 +48,49 @@ public class MessageService {
             GuestMessageCreateRequest request) {
         PersonalDesk desk = deskService.findBySupporterToken(supporterToken);
         validateDeskOpen(desk);
-        validateGuestRequest(request);
+        validateRequest(request, true);
 
-        String cardPayload = serialize(request.getCard());
-        DeskObjectRequest objectRequest = request.getObject();
-        String metadataPayload = serialize(objectRequest.getMetadata());
-        Instant createdAt = Instant.now();
-
-        Message message = messageRepository.save(Message.createByGuest(
+        Message message = Message.createByGuest(
                 guestIdentity,
                 request.getNickname().trim(),
                 request.getKind(),
                 request.getVisibility(),
                 request.getSchemaVersion(),
-                cardPayload));
+                serialize(request.getCard()));
+
+        return saveMessage(desk, message, request);
+    }
+
+    @Transactional
+    public MessageResponse createUserMessage(
+            String supporterToken,
+            UserAccount user,
+            GuestMessageCreateRequest request) {
+        PersonalDesk desk = deskService.findBySupporterToken(supporterToken);
+        validateDeskOpen(desk);
+        validateRequest(request, false);
+
+        Message message = Message.createByUser(
+                user,
+                request.getNickname(),
+                request.getKind(),
+                request.getVisibility(),
+                request.getSchemaVersion(),
+                serialize(request.getCard()));
+
+        return saveMessage(desk, message, request);
+    }
+
+    private MessageResponse saveMessage(
+            PersonalDesk desk,
+            Message message,
+            GuestMessageCreateRequest request) {
+
+        DeskObjectRequest objectRequest = request.getObject();
+        String metadataPayload = serialize(objectRequest.getMetadata());
+        Instant createdAt = Instant.now();
+
+        message = messageRepository.save(message);
 
         Instant unlockAt = request.getKind() == MessageKind.STICKER
                 ? createdAt
@@ -114,11 +144,11 @@ public class MessageService {
         }
     }
 
-    private void validateGuestRequest(GuestMessageCreateRequest request) {
-        if (request.getNickname() == null || request.getNickname().isBlank()) {
+    private void validateRequest(GuestMessageCreateRequest request, boolean guest) {
+        if (guest && (request.getNickname() == null || request.getNickname().isBlank())) {
             throw new CustomException(ErrorCode.GUEST_NICKNAME_REQUIRED);
         }
-        if (request.getNickname().trim().length() > 50) {
+        if (request.getNickname() != null && request.getNickname().trim().length() > 50) {
             throw new CustomException(ErrorCode.GUEST_NICKNAME_REQUIRED);
         }
         if (request.getKind() == null) {

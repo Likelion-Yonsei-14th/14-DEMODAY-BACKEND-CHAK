@@ -36,7 +36,7 @@ class UnlockTimeCalculatorTest {
 
     @Test
     void messageAfterCapsuleTimeUnlocksImmediately() {
-        UserAccount owner = UserAccount.create("지수");
+        UserAccount owner = UserAccount.createKakao("test-kakao-id-1", "지수", null, null);
         PersonalDesk desk = PersonalDesk.createClaimed(
                 owner,
                 "지수",
@@ -49,7 +49,7 @@ class UnlockTimeCalculatorTest {
     }
 
     private PersonalDesk dailyDesk() {
-        UserAccount owner = UserAccount.create("지수");
+        UserAccount owner = UserAccount.createKakao("test-kakao-id-2", "지수", null, null);
         return PersonalDesk.createClaimed(
                 owner,
                 "지수",

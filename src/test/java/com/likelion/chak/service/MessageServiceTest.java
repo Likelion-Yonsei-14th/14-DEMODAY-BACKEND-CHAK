@@ -131,8 +131,37 @@ class MessageServiceTest {
                 .isEqualTo(ErrorCode.INVALID_CARD_PAYLOAD);
     }
 
+    @Test
+    void memberMessageUsesAccountNameWhenNicknameIsBlank() {
+        PersonalDesk desk = createDesk(Instant.parse("2026-01-01T00:00:00Z"));
+        UserAccount author = userAccountRepository.save(
+                UserAccount.createKakao("member-author-1", "계정이름", null, null));
+
+        MessageResponse response = messageService.createUserMessage(
+                desk.getSupporterToken(),
+                author,
+                request("", "PUBLIC", 1));
+
+        assertThat(response.getAuthorDisplayName()).isEqualTo("계정이름");
+    }
+
+    @Test
+    void memberMessagePrefersNicknameOverride() {
+        PersonalDesk desk = createDesk(Instant.parse("2026-01-01T00:00:00Z"));
+        UserAccount author = userAccountRepository.save(
+                UserAccount.createKakao("member-author-2", "계정이름", null, null));
+
+        MessageResponse response = messageService.createUserMessage(
+                desk.getSupporterToken(),
+                author,
+                request("새 닉네임", "PUBLIC", 1));
+
+        assertThat(response.getAuthorDisplayName()).isEqualTo("새 닉네임");
+    }
+
     private PersonalDesk createDesk(Instant unlockAt) {
-        UserAccount owner = userAccountRepository.save(UserAccount.create("지수"));
+        UserAccount owner = userAccountRepository.save(
+                UserAccount.createKakao("test-kakao-id", "지수", null, null));
         return deskService.createClaimedDesk(
                 owner,
                 "지수",

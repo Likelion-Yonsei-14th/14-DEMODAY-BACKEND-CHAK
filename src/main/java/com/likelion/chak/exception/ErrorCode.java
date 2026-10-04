@@ -4,6 +4,14 @@ import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
 
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요합니다."),
+    FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "접근 권한이 없습니다."),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다."),
+    INVALID_KAKAO_AUTH_CODE(HttpStatus.UNAUTHORIZED, "INVALID_KAKAO_AUTH_CODE", "카카오 인가 코드가 유효하지 않습니다."),
+    KAKAO_API_ERROR(HttpStatus.BAD_GATEWAY, "KAKAO_API_ERROR", "카카오 로그인 서버와 통신하지 못했습니다."),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "리프레시 토큰이 유효하지 않습니다."),
+    EXPIRED_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "EXPIRED_REFRESH_TOKEN", "리프레시 토큰이 만료되었습니다."),
+    INVALID_REQUEST(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "요청 값이 올바르지 않습니다."),
     DESK_NOT_FOUND(HttpStatus.NOT_FOUND, "DESK_NOT_FOUND", "응원 책상을 찾을 수 없습니다."),
     DESK_CLOSED(HttpStatus.CONFLICT, "DESK_CLOSED", "이 책상은 새로운 응원을 받고 있지 않습니다."),
     PUBLIC_FEED_DISABLED(HttpStatus.FORBIDDEN, "PUBLIC_FEED_DISABLED", "공개 응원 보기가 비활성화되어 있습니다."),
