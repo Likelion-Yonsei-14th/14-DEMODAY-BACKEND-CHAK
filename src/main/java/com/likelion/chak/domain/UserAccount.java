@@ -36,6 +36,9 @@ public class UserAccount {
     @Column(length = 1000)
     private String profileImageUrl;
 
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean admin;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -61,6 +64,10 @@ public class UserAccount {
         this.displayName = displayName;
         this.email = email;
         this.profileImageUrl = profileImageUrl;
+    }
+
+    public void updateAdmin(boolean admin) {
+        this.admin = admin;
     }
 
     @PrePersist

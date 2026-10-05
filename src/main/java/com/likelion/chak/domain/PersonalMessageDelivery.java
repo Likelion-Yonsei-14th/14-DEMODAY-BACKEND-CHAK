@@ -6,6 +6,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
@@ -19,7 +20,10 @@ import java.time.Instant;
 
 @Getter
 @Entity
-@Table(name = "personal_message_deliveries")
+@Table(name = "personal_message_deliveries", indexes = {
+        @Index(name = "idx_delivery_desk_created", columnList = "desk_id, created_at"),
+        @Index(name = "idx_delivery_desk_unlock", columnList = "desk_id, unlock_at")
+})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PersonalMessageDelivery {
 

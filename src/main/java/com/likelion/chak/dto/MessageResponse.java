@@ -4,6 +4,7 @@ import com.likelion.chak.domain.Message;
 import com.likelion.chak.domain.MessageKind;
 import com.likelion.chak.domain.MessageVisibility;
 import com.likelion.chak.domain.PersonalMessageDelivery;
+import com.likelion.chak.domain.DeskObject;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import tools.jackson.databind.JsonNode;
@@ -21,11 +22,13 @@ public class MessageResponse {
     private MessageVisibility visibility;
     private int schemaVersion;
     private JsonNode card;
+    private DeskObjectResponse object;
     private Instant unlockAt;
     private Instant createdAt;
 
     public static MessageResponse from(
             PersonalMessageDelivery delivery,
+            DeskObject deskObject,
             ObjectMapper objectMapper) {
         Message message = delivery.getMessage();
         JsonNode card = null;
@@ -41,6 +44,7 @@ public class MessageResponse {
                 message.getVisibility(),
                 message.getSchemaVersion(),
                 card,
+                deskObject == null ? null : DeskObjectResponse.from(deskObject, objectMapper),
                 delivery.getUnlockAt(),
                 message.getCreatedAt());
     }
