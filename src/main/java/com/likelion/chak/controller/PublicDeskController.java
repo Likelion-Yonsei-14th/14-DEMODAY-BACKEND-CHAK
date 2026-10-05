@@ -2,12 +2,15 @@ package com.likelion.chak.controller;
 
 import com.likelion.chak.config.AuthenticatedUser;
 import com.likelion.chak.domain.UserAccount;
+import com.likelion.chak.domain.TrafficEventType;
 import com.likelion.chak.dto.GuestMessageCreateRequest;
 import com.likelion.chak.dto.GuestSession;
 import com.likelion.chak.dto.MessageResponse;
 import com.likelion.chak.dto.PublicDeskResponse;
+import com.likelion.chak.dto.SliceResponse;
 import com.likelion.chak.service.DeskService;
 import com.likelion.chak.service.AuthService;
+import com.likelion.chak.service.AnalyticsService;
 import com.likelion.chak.service.GuestIdentityService;
 import com.likelion.chak.service.MessageService;
 import lombok.RequiredArgsConstructor;
@@ -23,10 +26,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/public/desks")
@@ -35,6 +38,7 @@ public class PublicDeskController {
 
     private final DeskService deskService;
     private final AuthService authService;
+    private final AnalyticsService analyticsService;
     private final GuestIdentityService guestIdentityService;
     private final MessageService messageService;
 
@@ -49,26 +53,51 @@ public class PublicDeskController {
 
     @GetMapping("/{supporterToken}")
     public ResponseEntity<PublicDeskResponse> getDesk(
-            @PathVariable("supporterToken") String supporterToken) {
-        return ResponseEntity.ok(deskService.getPublicDesk(supporterToken));
+            @PathVariable("supporterToken") String supporterToken,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @CookieValue(name = "${chak.guest-cookie.name}", required = false) String guestKey) {
+        PublicDeskResponse response = deskService.getPublicDesk(supporterToken);
+        UserAccount user = authenticatedUser == null
+                ? null
+                : authService.getUser(authenticatedUser.userId());
+        GuestSession guestSession = user == null ? guestIdentityService.resolveOrCreate(guestKey) : null;
+        analyticsService.recordSystem(
+                user,
+                guestSession == null ? null : guestSession.getGuestIdentity(),
+                TrafficEventType.INVITE_LINK_OPEN,
+                "PERSONAL_DESK",
+                supporterToken,
+                "/public/desks/" + supporterToken);
+
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok();
+        if (guestSession != null && guestSession.isCreated()) {
+            builder.header(HttpHeaders.SET_COOKIE, createGuestCookie(
+                    guestSession.getGuestIdentity().getGuestKey()).toString());
+        }
+        return builder.body(response);
     }
 
     @GetMapping("/{supporterToken}/messages")
-    public ResponseEntity<List<MessageResponse>> getPublicMessages(
-            @PathVariable("supporterToken") String supporterToken) {
-        return ResponseEntity.ok(messageService.getPublicMessages(supporterToken));
+    public ResponseEntity<SliceResponse<MessageResponse>> getPublicMessages(
+            @PathVariable("supporterToken") String supporterToken,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
+        return ResponseEntity.ok(messageService.getPublicMessages(supporterToken, page, size));
     }
 
     @PostMapping("/{supporterToken}/messages")
     public ResponseEntity<MessageResponse> createGuestMessage(
             @PathVariable("supporterToken") String supporterToken,
-            @CookieValue(name = "chak_guest_id", required = false) String guestKey,
+            @CookieValue(name = "${chak.guest-cookie.name}", required = false) String guestKey,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @RequestBody GuestMessageCreateRequest request) {
         if (authenticatedUser != null) {
             UserAccount user = authService.getUser(authenticatedUser.userId());
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(messageService.createUserMessage(supporterToken, user, request));
+            MessageResponse response = messageService.createUserMessage(supporterToken, user, request);
+            analyticsService.recordSystem(
+                    user, null, TrafficEventType.MESSAGE_CREATED,
+                    "PERSONAL_DESK", supporterToken, "/public/desks/" + supporterToken + "/messages");
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
         }
 
         GuestSession guestSession = guestIdentityService.resolveOrCreate(guestKey);
@@ -76,6 +105,13 @@ public class PublicDeskController {
                 supporterToken,
                 guestSession.getGuestIdentity(),
                 request);
+        analyticsService.recordSystem(
+                null,
+                guestSession.getGuestIdentity(),
+                TrafficEventType.MESSAGE_CREATED,
+                "PERSONAL_DESK",
+                supporterToken,
+                "/public/desks/" + supporterToken + "/messages");
 
         ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.status(HttpStatus.CREATED);
         if (guestSession.isCreated()) {

@@ -13,6 +13,8 @@ import com.likelion.chak.domain.UserAccount;
 import com.likelion.chak.dto.DeskObjectRequest;
 import com.likelion.chak.dto.GuestMessageCreateRequest;
 import com.likelion.chak.dto.MessageResponse;
+import com.likelion.chak.dto.OwnerMessageResponse;
+import com.likelion.chak.dto.SliceResponse;
 import com.likelion.chak.exception.CustomException;
 import com.likelion.chak.exception.ErrorCode;
 import com.likelion.chak.repository.DeskObjectRepository;
@@ -21,11 +23,16 @@ import com.likelion.chak.repository.PersonalMessageDeliveryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.List;
+import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -46,15 +53,16 @@ public class MessageService {
             String supporterToken,
             GuestIdentity guestIdentity,
             GuestMessageCreateRequest request) {
-        PersonalDesk desk = deskService.findBySupporterToken(supporterToken);
+        PersonalDesk desk = deskService.findBySupporterTokenForUpdate(supporterToken);
         validateDeskOpen(desk);
         validateRequest(request, true);
 
+        MessageVisibility visibility = resolveVisibility(desk, request.getVisibility());
         Message message = Message.createByGuest(
                 guestIdentity,
                 request.getNickname().trim(),
                 request.getKind(),
-                request.getVisibility(),
+                visibility,
                 request.getSchemaVersion(),
                 serialize(request.getCard()));
 
@@ -66,15 +74,16 @@ public class MessageService {
             String supporterToken,
             UserAccount user,
             GuestMessageCreateRequest request) {
-        PersonalDesk desk = deskService.findBySupporterToken(supporterToken);
+        PersonalDesk desk = deskService.findBySupporterTokenForUpdate(supporterToken);
         validateDeskOpen(desk);
         validateRequest(request, false);
 
+        MessageVisibility visibility = resolveVisibility(desk, request.getVisibility());
         Message message = Message.createByUser(
                 user,
                 request.getNickname(),
                 request.getKind(),
-                request.getVisibility(),
+                visibility,
                 request.getSchemaVersion(),
                 serialize(request.getCard()));
 
@@ -103,7 +112,7 @@ public class MessageService {
                         unlockAt,
                         desk.getClaimStatus() == ClaimStatus.UNCLAIMED));
 
-        deskObjectRepository.save(DeskObject.create(
+        DeskObject deskObject = deskObjectRepository.save(DeskObject.create(
                 desk,
                 message,
                 objectRequest.getRepresentationType(),
@@ -116,26 +125,104 @@ public class MessageService {
                 objectRequest.getZIndex(),
                 metadataPayload));
 
-        return MessageResponse.from(delivery, objectMapper);
+        return MessageResponse.from(delivery, deskObject, objectMapper);
     }
 
     @Transactional(readOnly = true)
-    public List<MessageResponse> getPublicMessages(String supporterToken) {
+    public SliceResponse<MessageResponse> getPublicMessages(String supporterToken, int page, int size) {
         PersonalDesk desk = deskService.findBySupporterToken(supporterToken);
+        validatePage(page, size);
 
         if (!desk.isPublicFeedEnabled()) {
             throw new CustomException(ErrorCode.PUBLIC_FEED_DISABLED);
         }
 
-        return deliveryRepository
-                .findAllByDeskAndMessageVisibilityAndMessageStatusNotAndUnlockAtLessThanEqualOrderByCreatedAtDesc(
+        Slice<PersonalMessageDelivery> deliveries = deliveryRepository
+                .findAllByDeskAndMessageVisibilityAndMessageStatusNotAndUnlockAtLessThanEqualOrderByCreatedAtDescIdDesc(
                         desk,
                         MessageVisibility.PUBLIC,
                         MessageStatus.DELETED,
-                        Instant.now())
-                .stream()
-                .map(delivery -> MessageResponse.from(delivery, objectMapper))
+                        Instant.now(),
+                        PageRequest.of(page, size));
+        return mapSlice(deliveries, (delivery, object) -> MessageResponse.from(delivery, object, objectMapper));
+    }
+
+    @Transactional(readOnly = true)
+    public SliceResponse<OwnerMessageResponse> getOwnerMessages(
+            Long ownerId, boolean includeLocked, int page, int size) {
+        PersonalDesk desk = deskService.findByOwnerId(ownerId);
+        validatePage(page, size);
+        Instant now = Instant.now();
+        Slice<PersonalMessageDelivery> deliveries = includeLocked
+                ? deliveryRepository.findAllByDeskAndMessageStatusNotOrderByCreatedAtDescIdDesc(
+                        desk, MessageStatus.DELETED, PageRequest.of(page, size))
+                : deliveryRepository.findAllByDeskAndMessageStatusNotAndUnlockAtLessThanEqualOrderByCreatedAtDescIdDesc(
+                        desk, MessageStatus.DELETED, now, PageRequest.of(page, size));
+        return mapSlice(deliveries,
+                (delivery, object) -> OwnerMessageResponse.from(delivery, object, objectMapper, now));
+    }
+
+    // 기존 내부 호출 호환용이며, 테스트/소규모 배치에서도 무제한 조회하지 않는다.
+    @Transactional(readOnly = true)
+    public List<MessageResponse> getPublicMessages(String supporterToken) {
+        return getPublicMessages(supporterToken, 0, 100).content();
+    }
+
+    @Transactional(readOnly = true)
+    public List<OwnerMessageResponse> getOwnerMessages(Long ownerId, boolean includeLocked) {
+        return getOwnerMessages(ownerId, includeLocked, 0, 100).content();
+    }
+
+    @Transactional
+    public OwnerMessageResponse markOwnerMessageRead(Long ownerId, Long deliveryId) {
+        PersonalDesk desk = deskService.findByOwnerId(ownerId);
+        PersonalMessageDelivery delivery = findOwnerDelivery(desk, deliveryId);
+        Instant now = Instant.now();
+        if (!delivery.isUnlocked(now)) {
+            throw new CustomException(ErrorCode.MESSAGE_LOCKED);
+        }
+        delivery.getMessage().markRead(now);
+        return OwnerMessageResponse.from(
+                delivery,
+                deskObjectRepository.findByMessageId(delivery.getMessage().getId()).orElse(null),
+                objectMapper,
+                now);
+    }
+
+    @Transactional
+    public void deleteOwnerMessage(Long ownerId, Long deliveryId) {
+        PersonalDesk desk = deskService.findByOwnerId(ownerId);
+        PersonalMessageDelivery delivery = findOwnerDelivery(desk, deliveryId);
+        delivery.getMessage().delete(Instant.now());
+    }
+
+    private PersonalMessageDelivery findOwnerDelivery(PersonalDesk desk, Long deliveryId) {
+        return deliveryRepository.findForUpdateByIdAndDesk(deliveryId, desk)
+                .orElseThrow(() -> new CustomException(ErrorCode.MESSAGE_NOT_FOUND));
+    }
+
+    private void validatePage(int page, int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+    }
+
+    private <T> SliceResponse<T> mapSlice(
+            Slice<PersonalMessageDelivery> deliveries,
+            BiFunction<PersonalMessageDelivery, DeskObject, T> mapper) {
+        List<Long> messageIds = deliveries.getContent().stream()
+                .map(delivery -> delivery.getMessage().getId())
                 .toList();
+        Map<Long, DeskObject> objectsByMessageId = messageIds.isEmpty()
+                ? Map.of()
+                : deskObjectRepository.findAllByMessageIdIn(messageIds).stream()
+                        .collect(Collectors.toMap(object -> object.getMessage().getId(), object -> object));
+        List<T> content = deliveries.getContent().stream()
+                .map(delivery -> mapper.apply(
+                        delivery,
+                        objectsByMessageId.get(delivery.getMessage().getId())))
+                .toList();
+        return SliceResponse.from(deliveries, content);
     }
 
     private void validateDeskOpen(PersonalDesk desk) {
@@ -154,9 +241,6 @@ public class MessageService {
         if (request.getKind() == null) {
             throw new CustomException(ErrorCode.INVALID_MESSAGE_KIND);
         }
-        if (request.getVisibility() == null) {
-            throw new CustomException(ErrorCode.INVALID_MESSAGE_VISIBILITY);
-        }
         if (request.getSchemaVersion() == null
                 || request.getSchemaVersion() != CURRENT_SCHEMA_VERSION) {
             throw new CustomException(ErrorCode.INVALID_CARD_PAYLOAD);
@@ -164,6 +248,10 @@ public class MessageService {
 
         validateCard(request.getKind(), request.getCard());
         validateDeskObject(request.getObject());
+    }
+
+    private MessageVisibility resolveVisibility(PersonalDesk desk, MessageVisibility requested) {
+        return requested == null ? desk.getDefaultMessageVisibility() : requested;
     }
 
     private void validateCard(MessageKind kind, JsonNode card) {

@@ -32,7 +32,7 @@ public class PersonalDesk {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_id")
+    @JoinColumn(name = "owner_id", unique = true)
     private UserAccount owner;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -59,6 +59,10 @@ public class PersonalDesk {
 
     @Column(nullable = false)
     private boolean publicFeedEnabled;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20, columnDefinition = "varchar(20) default 'PRIVATE'")
+    private MessageVisibility defaultMessageVisibility;
 
     @Column(nullable = false)
     private boolean roomClosed;
@@ -89,6 +93,7 @@ public class PersonalDesk {
         this.capsuleUnlockAt = capsuleUnlockAt;
         this.timezone = "Asia/Seoul";
         this.publicFeedEnabled = true;
+        this.defaultMessageVisibility = MessageVisibility.PRIVATE;
         this.roomClosed = false;
         this.supporterToken = UUID.randomUUID().toString();
     }
@@ -127,6 +132,25 @@ public class PersonalDesk {
 
     public void closeRoom() {
         this.roomClosed = true;
+    }
+
+    public void openRoom() {
+        this.roomClosed = false;
+    }
+
+    public void updateSettings(
+            String displayName,
+            ReadModeType readModeType,
+            LocalTime dailyUnlockTime,
+            Instant capsuleUnlockAt,
+            boolean publicFeedEnabled,
+            MessageVisibility defaultMessageVisibility) {
+        this.displayName = displayName;
+        this.readModeType = readModeType;
+        this.dailyUnlockTime = dailyUnlockTime;
+        this.capsuleUnlockAt = capsuleUnlockAt;
+        this.publicFeedEnabled = publicFeedEnabled;
+        this.defaultMessageVisibility = defaultMessageVisibility;
     }
 
     @PrePersist

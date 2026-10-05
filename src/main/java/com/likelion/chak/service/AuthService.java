@@ -9,6 +9,9 @@ import com.likelion.chak.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
+
+import java.util.Arrays;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +20,9 @@ public class AuthService {
     private final KakaoClient kakaoClient;
     private final UserAccountRepository userAccountRepository;
     private final TokenService tokenService;
+
+    @Value("${chak.admin-kakao-ids:}")
+    private String adminKakaoIds;
 
     @Transactional
     public AuthTokenResponse loginWithKakao(KakaoLoginRequest request) {
@@ -29,6 +35,8 @@ public class AuthService {
                         profile.email(),
                         profile.profileImageUrl())));
 
+        user.updateAdmin(isConfiguredAdmin(profile.kakaoId()));
+
         return tokenService.issue(user);
     }
 
@@ -38,8 +46,23 @@ public class AuthService {
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }
 
+    @Transactional(readOnly = true)
+    public UserAccount getAdmin(Long userId) {
+        UserAccount user = getUser(userId);
+        if (!user.isAdmin()) {
+            throw new CustomException(ErrorCode.ADMIN_REQUIRED);
+        }
+        return user;
+    }
+
     private UserAccount updateProfile(UserAccount user, KakaoProfile profile) {
         user.updateKakaoProfile(profile.nickname(), profile.email(), profile.profileImageUrl());
         return user;
+    }
+
+    private boolean isConfiguredAdmin(String kakaoId) {
+        return Arrays.stream(adminKakaoIds.split(","))
+                .map(String::trim)
+                .anyMatch(kakaoId::equals);
     }
 }

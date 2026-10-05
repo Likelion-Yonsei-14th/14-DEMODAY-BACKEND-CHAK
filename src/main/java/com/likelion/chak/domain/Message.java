@@ -142,6 +142,17 @@ public class Message {
         }
     }
 
+    public void changeVisibility(MessageVisibility visibility) {
+        if (status != MessageStatus.DELETED) {
+            this.visibility = visibility;
+        }
+    }
+
+    public void delete(Instant deletedAt) {
+        this.status = MessageStatus.DELETED;
+        this.deletedAt = deletedAt;
+    }
+
     private static String normalizeNickname(String nickname) {
         if (nickname == null || nickname.isBlank()) {
             return null;
