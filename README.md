@@ -19,7 +19,7 @@
 - JWT access token과 회전형 refresh token
 - 로그인 회원 편지 작성 및 닉네임 fallback
 - 로그인 사용자의 개인 책상 생성·설정·접수 관리
-- 잠금 보호를 포함한 받은 편지 조회·읽음·삭제
+- 잠금 보호를 포함한 받은 편지 조회·읽음·삭제·바구니 이동
 - S3 presigned URL 이미지 업로드 및 완료 검증
 - 광고 기간·위치 관리와 노출·시청·클릭 기록
 - 회원·비회원 트래픽 이벤트 및 운영자 집계
@@ -85,6 +85,7 @@ DB 구조: [`docs/DATABASE.md`](docs/DATABASE.md)
 GET  /api/public/desks/{supporterToken}
 GET  /api/public/desks/{supporterToken}/messages?page=0&size=20
 POST /api/public/desks/{supporterToken}/messages
+GET  /api/public/health
 GET  /api/public/ads?placement=DESK
 POST /api/public/ads/{advertisementId}/events
 POST /api/public/analytics/events

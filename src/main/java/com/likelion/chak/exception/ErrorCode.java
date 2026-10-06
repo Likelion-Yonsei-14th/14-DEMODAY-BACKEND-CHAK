@@ -18,6 +18,7 @@ public enum ErrorCode {
     INVALID_DESK_SETTINGS(HttpStatus.BAD_REQUEST, "INVALID_DESK_SETTINGS", "책상 공개 시각 설정이 올바르지 않습니다."),
     DESK_CLOSED(HttpStatus.CONFLICT, "DESK_CLOSED", "이 책상은 새로운 응원을 받고 있지 않습니다."),
     MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "MESSAGE_NOT_FOUND", "편지를 찾을 수 없습니다."),
+    MESSAGE_NOT_READ(HttpStatus.CONFLICT, "MESSAGE_NOT_READ", "읽은 편지만 바구니로 옮길 수 있습니다."),
     MESSAGE_LOCKED(HttpStatus.CONFLICT, "MESSAGE_LOCKED", "아직 열어볼 수 없는 편지입니다."),
     MEDIA_NOT_FOUND(HttpStatus.NOT_FOUND, "MEDIA_NOT_FOUND", "업로드 자산을 찾을 수 없습니다."),
     INVALID_MEDIA(HttpStatus.BAD_REQUEST, "INVALID_MEDIA", "업로드할 이미지 정보가 올바르지 않습니다."),
@@ -33,6 +34,9 @@ public enum ErrorCode {
     INVALID_MESSAGE_KIND(HttpStatus.BAD_REQUEST, "INVALID_MESSAGE_KIND", "지원하지 않는 응원 종류입니다."),
     INVALID_CARD_PAYLOAD(HttpStatus.BAD_REQUEST, "INVALID_CARD_PAYLOAD", "카드 데이터 형식이 올바르지 않습니다."),
     INVALID_DESK_OBJECT(HttpStatus.BAD_REQUEST, "INVALID_DESK_OBJECT", "책상 오브젝트 정보가 올바르지 않습니다."),
+    NOT_FOUND(HttpStatus.NOT_FOUND, "NOT_FOUND", "요청한 경로를 찾을 수 없습니다."),
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "지원하지 않는 요청 방식입니다."),
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_MEDIA_TYPE", "지원하지 않는 Content-Type입니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다.");
 
     private final HttpStatus status;

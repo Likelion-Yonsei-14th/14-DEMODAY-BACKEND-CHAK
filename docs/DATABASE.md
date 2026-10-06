@@ -92,7 +92,7 @@ traffic_events (user 또는 guest, FK 없는 resource_key)
 | desk_id | BIGINT FK personal_desks | |
 | unlock_at | DATETIME(6) | 공개 시각 |
 | preclaim_backlog | BOOLEAN | 예약 필드 |
-| basketed_at | DATETIME(6) | 예약 필드 |
+| basketed_at | DATETIME(6) | 바구니로 옮긴 시각 (`POST /api/desks/me/messages/basket`) |
 | created_at | DATETIME(6) | |
 
 인덱스: `(desk_id, created_at)`, `(desk_id, unlock_at)`

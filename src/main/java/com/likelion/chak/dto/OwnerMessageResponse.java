@@ -24,6 +24,7 @@ public record OwnerMessageResponse(
         DeskObjectResponse object,
         Instant unlockAt,
         Instant readAt,
+        Instant basketedAt,
         Instant createdAt) {
 
     public static OwnerMessageResponse from(
@@ -50,6 +51,7 @@ public record OwnerMessageResponse(
                 deskObject == null ? null : DeskObjectResponse.from(deskObject, objectMapper),
                 delivery.getUnlockAt(),
                 message.getReadAt(),
+                delivery.getBasketedAt(),
                 message.getCreatedAt());
     }
 }

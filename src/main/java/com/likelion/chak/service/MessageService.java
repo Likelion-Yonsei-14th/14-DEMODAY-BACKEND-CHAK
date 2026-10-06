@@ -40,6 +40,7 @@ public class MessageService {
 
     private static final int CURRENT_SCHEMA_VERSION = 1;
     private static final int MAX_CARD_PAYLOAD_LENGTH = 500_000;
+    private static final Instant MAX_UNLOCK_BOUND = Instant.parse("9999-01-01T00:00:00Z");
 
     private final DeskService deskService;
     private final UnlockTimeCalculator unlockTimeCalculator;
@@ -150,14 +151,23 @@ public class MessageService {
     @Transactional(readOnly = true)
     public SliceResponse<OwnerMessageResponse> getOwnerMessages(
             Long ownerId, boolean includeLocked, int page, int size) {
+        return getOwnerMessages(ownerId, includeLocked, null, page, size);
+    }
+
+    /** basketed: null이면 전체, true면 바구니 안, false면 바구니 밖 편지만 반환한다. */
+    @Transactional(readOnly = true)
+    public SliceResponse<OwnerMessageResponse> getOwnerMessages(
+            Long ownerId, boolean includeLocked, Boolean basketed, int page, int size) {
         PersonalDesk desk = deskService.findByOwnerId(ownerId);
         validatePage(page, size);
         Instant now = Instant.now();
-        Slice<PersonalMessageDelivery> deliveries = includeLocked
-                ? deliveryRepository.findAllByDeskAndMessageStatusNotOrderByCreatedAtDescIdDesc(
-                        desk, MessageStatus.DELETED, PageRequest.of(page, size))
-                : deliveryRepository.findAllByDeskAndMessageStatusNotAndUnlockAtLessThanEqualOrderByCreatedAtDescIdDesc(
-                        desk, MessageStatus.DELETED, now, PageRequest.of(page, size));
+        String basketMode = basketed == null ? "ALL" : basketed ? "IN" : "OUT";
+        Slice<PersonalMessageDelivery> deliveries = deliveryRepository.findOwnerDeliveries(
+                desk,
+                MessageStatus.DELETED,
+                includeLocked ? MAX_UNLOCK_BOUND : now,
+                basketMode,
+                PageRequest.of(page, size));
         return mapSlice(deliveries,
                 (delivery, object) -> OwnerMessageResponse.from(delivery, object, objectMapper, now));
     }
@@ -187,6 +197,34 @@ public class MessageService {
                 deskObjectRepository.findByMessageId(delivery.getMessage().getId()).orElse(null),
                 objectMapper,
                 now);
+    }
+
+    /** 읽은 편지를 바구니로 옮긴다. 이미 바구니에 있으면 그대로 두며, 하나라도 읽지 않았으면 전체를 거부한다. */
+    @Transactional
+    public List<OwnerMessageResponse> basketOwnerMessages(Long ownerId, List<Long> deliveryIds) {
+        PersonalDesk desk = deskService.findByOwnerId(ownerId);
+        Instant now = Instant.now();
+        List<Long> orderedIds = deliveryIds.stream().distinct().sorted().toList();
+        List<PersonalMessageDelivery> deliveries = orderedIds.stream()
+                .map(id -> findOwnerDelivery(desk, id))
+                .toList();
+        for (PersonalMessageDelivery delivery : deliveries) {
+            Message message = delivery.getMessage();
+            if (message.getStatus() == MessageStatus.DELETED) {
+                throw new CustomException(ErrorCode.MESSAGE_NOT_FOUND);
+            }
+            if (message.getStatus() != MessageStatus.READ) {
+                throw new CustomException(ErrorCode.MESSAGE_NOT_READ);
+            }
+        }
+        deliveries.forEach(delivery -> delivery.basket(now));
+        return deliveries.stream()
+                .map(delivery -> OwnerMessageResponse.from(
+                        delivery,
+                        deskObjectRepository.findByMessageId(delivery.getMessage().getId()).orElse(null),
+                        objectMapper,
+                        now))
+                .toList();
     }
 
     @Transactional

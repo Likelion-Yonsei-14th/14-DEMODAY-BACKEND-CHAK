@@ -37,7 +37,7 @@
 - **비회원 쿠키 `chak_guest_id`**: HttpOnly, 1년, `Path=/`. 모든 `/api/public/**` 호출에 `credentials: "include"`(axios는 `withCredentials: true`)를 사용해야 합니다. JS에서 읽을 수 없습니다.
 - **쿠키 SameSite/Secure**: 기본 `SameSite=Lax`, `Secure=false`. 프론트와 API가 **다른 사이트(도메인)** 이면 쿠키가 전송되지 않으므로 백엔드에 `GUEST_COOKIE_SAME_SITE=None`, `GUEST_COOKIE_SECURE=true`(HTTPS 필수)를 설정합니다. 같은 사이트(서브도메인 포함)면 기본값을 유지합니다. 로컬 개발(`localhost` ↔ `localhost`)은 기본값으로 동작합니다.
 - **토큰 저장**: access/refresh 토큰은 응답 본문으로만 전달됩니다(쿠키 아님). 프론트가 저장하고 Bearer 헤더로 전송합니다.
-- **에러 응답**: 모든 에러는 `{ "code", "message" }` 형식이며 필드별 검증 상세는 없습니다. 프론트는 `code`로 분기하세요.
+- **에러 응답**: 404·405·415를 포함한 모든 에러는 `{ "code", "message" }` 형식이며 필드별 검증 상세는 없습니다. 프론트는 `code`로 분기하세요.
 - **JSON 필드 이름**: camelCase. 알 수 없는 필드는 무시, `null`은 허용되는 필드에서만 사용.
 - **이미지 업로드**: S3로 직접 `PUT`하므로 S3 버킷 CORS에 프론트 Origin, `PUT` 메서드, `Content-Type` 헤더를 허용해야 합니다(백엔드 CORS와 별개).
 
@@ -203,6 +203,10 @@ https://kauth.kakao.com/oauth/authorize
 ```
 
 ## 4. 공개 책상 API
+
+### 4.0 서버 상태 확인
+
+`GET /api/public/health` → `200 OK` `{ "status": "UP" }`. 인증 불필요이며 프론트 연결 확인과 배포 헬스체크에 사용합니다.
 
 ### 4.1 공개 책상 조회
 
@@ -410,9 +414,10 @@ POST /api/desks/me/open
 
 ### 5.5 받은 편지 조회
 
-`GET /api/desks/me/messages?includeLocked=true&page=0&size=20`
+`GET /api/desks/me/messages?includeLocked=true&basketed=false&page=0&size=20`
 
 - `includeLocked` 기본값: `true`
+- `basketed` 생략 시 전체, `true`면 바구니 안, `false`면 바구니 밖 편지만 조회
 - 잠긴 편지도 오브젝트와 작성자 정보는 반환하지만 `card`는 `null`
 - 삭제된 편지는 반환하지 않음
 
@@ -442,6 +447,7 @@ POST /api/desks/me/open
       },
       "unlockAt": "2026-11-13T00:00:00Z",
       "readAt": null,
+      "basketedAt": null,
       "createdAt": "2026-10-04T07:00:00Z"
     }
   ],
@@ -451,7 +457,7 @@ POST /api/desks/me/open
 }
 ```
 
-`page`는 0부터 시작하고 `size`는 1~100입니다.
+`page`는 0부터 시작하고 `size`는 1~100입니다. `basketedAt`은 바구니로 옮긴 시각이며 바구니 밖이면 `null`입니다.
 
 ### 5.6 읽음 처리·삭제
 
@@ -461,6 +467,21 @@ DELETE /api/desks/me/messages/{deliveryId}
 ```
 
 잠긴 편지는 읽음 처리할 수 없습니다. 삭제는 soft delete입니다.
+
+### 5.7 읽은 편지 바구니로 이동
+
+`POST /api/desks/me/messages/basket`
+
+```json
+{ "deliveryIds": [21, 22] }
+```
+
+- 1~100개, 중복 ID는 무시합니다.
+- 모든 편지가 읽음 상태여야 하며 하나라도 읽지 않았으면 `409 MESSAGE_NOT_READ`로 전체가 거부됩니다.
+- 이미 바구니에 있는 편지는 그대로 둡니다(멱등).
+- 내 책상의 편지가 아니거나 삭제된 편지가 있으면 `404 MESSAGE_NOT_FOUND`입니다.
+- 응답 `200 OK`: 처리된 `OwnerMessageResponse` 배열(`basketedAt` 설정됨)
+- 바구니에서 꺼내는 API는 아직 없습니다.
 
 ## 6. 이미지 업로드 API
 
@@ -677,12 +698,16 @@ GET   /api/admin/analytics/summary?from={ISO_INSTANT}&to={ISO_INSTANT}
 | 404 | `ADVERTISEMENT_NOT_FOUND` | 광고 없음 |
 | 409 | `DESK_CLOSED` | 편지 접수 종료 |
 | 409 | `DESK_ALREADY_EXISTS` | 계정에 이미 책상이 있음 |
+| 409 | `MESSAGE_NOT_READ` | 읽지 않은 편지를 바구니로 이동 시도 |
 | 409 | `MESSAGE_LOCKED` | 공개 시각 전 읽기 요청 |
 | 409 | `MEDIA_UPLOAD_NOT_FOUND` | S3에서 업로드 결과를 찾지 못함 |
 | 429 | `TOO_MANY_EVENTS` | 이벤트 요청 한도 초과 |
 | 502 | `KAKAO_API_ERROR` | 카카오 API 통신 또는 설정 오류 |
 | 502 | `STORAGE_API_ERROR` | Object Storage 통신 오류 |
 | 503 | `STORAGE_NOT_CONFIGURED` | Object Storage 환경변수 미설정 |
+| 404 | `NOT_FOUND` | 존재하지 않는 경로 |
+| 405 | `METHOD_NOT_ALLOWED` | 지원하지 않는 HTTP 메서드 |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | `application/json`이 아닌 Content-Type |
 | 500 | `INTERNAL_SERVER_ERROR` | 서버 내부 오류 |
 
 ## 10. 아직 제공하지 않는 API

@@ -73,6 +73,12 @@ public class PersonalMessageDelivery {
         return !unlockAt.isAfter(now);
     }
 
+    public void basket(Instant at) {
+        if (this.basketedAt == null) {
+            this.basketedAt = at;
+        }
+    }
+
     @PrePersist
     public void prePersist() {
         this.createdAt = Instant.now();
