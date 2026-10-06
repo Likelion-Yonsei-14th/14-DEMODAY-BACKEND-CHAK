@@ -114,6 +114,33 @@ class OwnerDeskServiceTest {
     }
 
     @Test
+    void onlyReadMessagesCanBeBasketedAndListFiltersByBasket() {
+        UserAccount owner = saveUser("owner-basket");
+        deskService.createMyDesk(owner, createRequest(Instant.parse("2026-01-01T00:00:00Z")));
+        PersonalDesk desk = deskService.findByOwnerId(owner.getId());
+        createGuestMessage(desk, "PRIVATE");
+        createGuestMessage(desk, "PRIVATE");
+        List<OwnerMessageResponse> messages = messageService.getOwnerMessages(owner.getId(), true);
+        Long readId = messages.get(0).deliveryId();
+        Long unreadId = messages.get(1).deliveryId();
+        messageService.markOwnerMessageRead(owner.getId(), readId);
+
+        assertThatThrownBy(() -> messageService.basketOwnerMessages(owner.getId(), List.of(readId, unreadId)))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.MESSAGE_NOT_READ);
+
+        List<OwnerMessageResponse> basketed = messageService.basketOwnerMessages(owner.getId(), List.of(readId, readId));
+        assertThat(basketed).singleElement().satisfies(item -> assertThat(item.basketedAt()).isNotNull());
+
+        assertThat(messageService.getOwnerMessages(owner.getId(), true, true, 0, 20).content())
+                .extracting(OwnerMessageResponse::deliveryId).containsExactly(readId);
+        assertThat(messageService.getOwnerMessages(owner.getId(), true, false, 0, 20).content())
+                .extracting(OwnerMessageResponse::deliveryId).containsExactly(unreadId);
+        assertThat(messageService.getOwnerMessages(owner.getId(), true, null, 0, 20).content()).hasSize(2);
+    }
+
+    @Test
     void ownerMessagesArePaged() {
         UserAccount owner = saveUser("owner-paged-messages");
         deskService.createMyDesk(owner, createRequest(Instant.parse("2026-01-01T00:00:00Z")));

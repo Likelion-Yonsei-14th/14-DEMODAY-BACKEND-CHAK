@@ -2,6 +2,7 @@ package com.likelion.chak.controller;
 
 import com.likelion.chak.config.AuthenticatedUser;
 import com.likelion.chak.domain.UserAccount;
+import com.likelion.chak.dto.BasketRequest;
 import com.likelion.chak.dto.DeskCreateRequest;
 import com.likelion.chak.dto.DeskSettingsRequest;
 import com.likelion.chak.dto.MessageResponseBody;
@@ -27,6 +28,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 
 @RestController
@@ -82,10 +85,20 @@ public class OwnerDeskController {
     public ResponseEntity<SliceResponse<OwnerMessageResponse>> getMessages(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @RequestParam(name = "includeLocked", defaultValue = "true") boolean includeLocked,
+            @RequestParam(name = "basketed", required = false) Boolean basketed,
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(messageService.getOwnerMessages(
-                principal.userId(), includeLocked, page, size));
+                principal.userId(), includeLocked, basketed, page, size));
+    }
+
+    @Operation(summary = "읽은 편지를 바구니로 이동")
+    @PostMapping("/messages/basket")
+    public ResponseEntity<List<OwnerMessageResponse>> basket(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @Valid @RequestBody BasketRequest request) {
+        return ResponseEntity.ok(messageService.basketOwnerMessages(
+                principal.userId(), request.deliveryIds()));
     }
 
     @Operation(summary = "받은 편지 읽음 처리")
