@@ -37,5 +37,8 @@ build/
 .env
 application-local.properties
 
+# Local AI handoff notes
+/AI_MJ.md
+
 # macOS
 .DS_Store
