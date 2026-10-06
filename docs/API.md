@@ -20,6 +20,55 @@
 }
 ```
 
+### 인증 필요 여부 한눈에 보기
+
+| 경로 | 인증 |
+| --- | --- |
+| `POST /api/auth/kakao`, `POST /api/auth/refresh` | 불필요 |
+| `/api/public/**` | 선택 (Bearer가 있으면 회원으로 처리) |
+| `POST /api/auth/logout`, `/api/users/**`, `/api/desks/me/**`, `/api/media/**` | 필수 |
+| `/api/admin/**` | 필수 + 운영자 |
+
+> 주의: `/api/public/**`도 `Authorization` 헤더가 **있으면** 토큰을 검증합니다. 만료·변조된 토큰을 보내면 공개 API라도 `401 UNAUTHORIZED`가 반환되므로, 프론트는 401을 받으면 `/api/auth/refresh` 후 재시도하거나 헤더 없이 비회원으로 재요청해야 합니다.
+
+### 프론트 통신 설정
+
+- **CORS**: 서버는 `CORS_ALLOWED_ORIGINS`(쉼표 구분, 기본 `http://localhost:3000,http://localhost:5173`)의 Origin만 허용합니다. 허용 메서드 `GET POST PATCH DELETE OPTIONS`, 허용 헤더 `Authorization`, `Content-Type`, 자격증명(쿠키) 허용. 와일드카드 불가. 배포 도메인은 백엔드 환경변수에 추가해야 합니다.
+- **비회원 쿠키 `chak_guest_id`**: HttpOnly, 1년, `Path=/`. 모든 `/api/public/**` 호출에 `credentials: "include"`(axios는 `withCredentials: true`)를 사용해야 합니다. JS에서 읽을 수 없습니다.
+- **쿠키 SameSite/Secure**: 기본 `SameSite=Lax`, `Secure=false`. 프론트와 API가 **다른 사이트(도메인)** 이면 쿠키가 전송되지 않으므로 백엔드에 `GUEST_COOKIE_SAME_SITE=None`, `GUEST_COOKIE_SECURE=true`(HTTPS 필수)를 설정합니다. 같은 사이트(서브도메인 포함)면 기본값을 유지합니다. 로컬 개발(`localhost` ↔ `localhost`)은 기본값으로 동작합니다.
+- **토큰 저장**: access/refresh 토큰은 응답 본문으로만 전달됩니다(쿠키 아님). 프론트가 저장하고 Bearer 헤더로 전송합니다.
+- **에러 응답**: 모든 에러는 `{ "code", "message" }` 형식이며 필드별 검증 상세는 없습니다. 프론트는 `code`로 분기하세요.
+- **JSON 필드 이름**: camelCase. 알 수 없는 필드는 무시, `null`은 허용되는 필드에서만 사용.
+- **이미지 업로드**: S3로 직접 `PUT`하므로 S3 버킷 CORS에 프론트 Origin, `PUT` 메서드, `Content-Type` 헤더를 허용해야 합니다(백엔드 CORS와 별개).
+
+### enum 값
+
+| 이름 | 값 |
+| --- | --- |
+| ReadModeType | `DAILY`, `TIME_CAPSULE` |
+| MessageVisibility | `PUBLIC`, `PRIVATE` |
+| MessageKind | `CARD`, `STICKER` |
+| MessageStatus | `SENT`, `READ` (삭제된 편지는 반환되지 않음) |
+| DeskObjectType (`representationType`) | `MEMO`, `PHOTO_CARD`, `CHARM`, `POSTER_CARD`, `LETTER`, `TICKET`, `GENERIC_CARD`, `STICKER` |
+| MediaPurpose | `PROFILE`, `CARD` |
+| MediaStatus | `PENDING`, `UPLOADED` |
+| AdPlacement | `HOME`, `DESK`, `MESSAGE_COMPLETE` |
+| AdEventType | `IMPRESSION`, `VIEW_STARTED`, `VIEW_COMPLETED`, `CLICK` |
+| TrafficEventType (클라이언트 전송 가능) | `PAGE_VIEW`, `MESSAGE_COMPOSE_STARTED` |
+
+잘못된 enum 값이나 JSON 파싱 오류는 `400 INVALID_REQUEST`입니다.
+
+### 시간 규칙
+
+- 모든 시각 필드(`Instant`)는 ISO 8601 UTC 문자열입니다.
+- `dailyUnlockTime`은 `HH:mm:ss` 형식의 **한국시간(Asia/Seoul) 기준** 로컬 시각입니다.
+- `DAILY` 책상: 작성 시각이 당일 `dailyUnlockTime`을 지났으면 다음 날 `dailyUnlockTime`, 아니면 당일 `dailyUnlockTime`이 `unlockAt`입니다.
+- `TIME_CAPSULE` 책상: `unlockAt`은 `capsuleUnlockAt`이며, 이미 지난 뒤 작성한 편지는 작성 시각입니다(즉시 열림).
+
+### DB 구조
+
+테이블·컬럼·제약은 [`DATABASE.md`](DATABASE.md)를 참고하세요.
+
 ## 2. 카카오 로그인 흐름
 
 1. 프론트가 사용자를 카카오 인가 URL로 이동시킵니다.
@@ -475,9 +524,26 @@ S3 버킷은 프론트 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허
 
 `GET /api/public/ads?placement=DESK`
 
-`placement`: `HOME`, `DESK`, `MESSAGE_COMPLETE`
+`placement`: `HOME`, `DESK`, `MESSAGE_COMPLETE` (필수, 잘못된 값은 `400 INVALID_REQUEST`)
 
-현재 시간이 노출 기간 안에 있고 활성화된 광고만 반환합니다.
+현재 시간이 노출 기간 안에 있고 활성화된 광고만 배열로 반환합니다. 광고가 없으면 `[]`입니다.
+
+응답 `200 OK`:
+
+```json
+[
+  {
+    "id": 1,
+    "title": "응원 캠페인",
+    "creativeUrl": "https://cdn.example.com/ad.webp",
+    "destinationUrl": "https://example.com/campaign",
+    "placement": "DESK",
+    "startsAt": "2026-10-04T00:00:00Z",
+    "endsAt": "2026-11-30T23:59:59Z",
+    "active": true
+  }
+]
+```
 
 ### 7.2 광고 이벤트 기록
 
@@ -494,6 +560,8 @@ S3 버킷은 프론트 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허
 ```
 
 `eventType`: `IMPRESSION`, `VIEW_STARTED`, `VIEW_COMPLETED`, `CLICK`
+
+응답 `201 Created`: `{ "eventId": 15 }` (중복 재시도도 성공 응답)
 
 `sessionId`는 광고가 실제로 한 번 렌더링될 때마다 새로 만드는 노출 식별자로 필수입니다. 네트워크 재시도에는 같은 값을 사용하며, 같은 광고·이벤트 종류·`sessionId` 조합은 한 번만 저장합니다. 비활성 또는 노출 기간 밖 광고의 이벤트는 거부하며, 비회원은 `chak_guest_id` 쿠키로 연결됩니다.
 
@@ -515,6 +583,8 @@ S3 버킷은 프론트 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허
   "metadata": {"utmSource": "instagram"}
 }
 ```
+
+응답 `201 Created`: `{ "eventId": 42 }` (서버 저장 ID)
 
 `eventId`는 이벤트마다 생성한 고유 값이며 네트워크 재시도에는 같은 값을 사용합니다. 클라이언트가 보낼 수 있는 `eventType`은 `PAGE_VIEW`, `MESSAGE_COMPOSE_STARTED`입니다.
 
@@ -546,6 +616,37 @@ GET   /api/admin/analytics/summary?from={ISO_INSTANT}&to={ISO_INSTANT}
   "active": true
 }
 ```
+
+응답:
+
+| API | 상태 | 본문 |
+| --- | --- | --- |
+| `GET /ads` | 200 | 광고 배열 (페이지네이션 없음, 7.1의 광고 객체와 동일) |
+| `POST /ads` | 201 | 광고 객체 |
+| `PATCH /ads/{id}` | 200 | 광고 객체 (요청 본문은 생성과 동일, 전체 값 필요) |
+| `DELETE /ads/{id}` | 200 | `{ "message": "광고가 비활성화되었습니다." }` |
+| `GET /ads/{id}/metrics` | 200 | 아래 예시 |
+| `GET /analytics/summary` | 200 | 아래 예시 |
+
+```json
+// metrics
+{
+  "advertisementId": 1,
+  "from": "2026-10-01T00:00:00Z",
+  "to": "2026-10-08T00:00:00Z",
+  "events": {"IMPRESSION": 120, "VIEW_COMPLETED": 40, "CLICK": 9}
+}
+
+// summary
+{
+  "from": "2026-10-01T00:00:00Z",
+  "to": "2026-10-08T00:00:00Z",
+  "trafficEvents": {"PAGE_VIEW": 300, "INVITE_LINK_OPEN": 80, "MESSAGE_CREATED": 25},
+  "advertisementEvents": {"IMPRESSION": 120, "CLICK": 9}
+}
+```
+
+건수가 0인 이벤트 종류는 맵에 포함되지 않을 수 있습니다. 광고 요청은 `endsAt`이 `startsAt`보다 늦어야 하고 URL은 `http(s)`여야 합니다(`INVALID_ADVERTISEMENT`).
 
 `DELETE`는 이력을 유지한 채 광고를 비활성화합니다. 광고별 지표는 해당 광고의 노출·시청·클릭 건수를 반환합니다. 전체 분석 요약은 트래픽과 광고 이벤트 종류별 건수를 반환합니다. 조회 범위는 최대 366일이며 기간을 생략하면 최근 7일입니다.
 

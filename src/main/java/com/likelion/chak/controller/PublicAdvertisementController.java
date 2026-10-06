@@ -49,6 +49,9 @@ public class PublicAdvertisementController {
     @Value("${chak.guest-cookie.secure}")
     private boolean guestCookieSecure;
 
+    @Value("${chak.guest-cookie.same-site:Lax}")
+    private String guestCookieSameSite;
+
     @GetMapping
     public ResponseEntity<List<AdvertisementResponse>> getActive(
             @RequestParam("placement") AdPlacement placement) {
@@ -78,7 +81,7 @@ public class PublicAdvertisementController {
         return ResponseCookie.from(guestCookieName, guestKey)
                 .httpOnly(true)
                 .secure(guestCookieSecure)
-                .sameSite("Lax")
+                .sameSite(guestCookieSameSite)
                 .path("/")
                 .maxAge(Duration.ofSeconds(guestCookieMaxAgeSeconds))
                 .build();

@@ -43,6 +43,9 @@ public class PublicAnalyticsController {
     @Value("${chak.guest-cookie.secure}")
     private boolean guestCookieSecure;
 
+    @Value("${chak.guest-cookie.same-site:Lax}")
+    private String guestCookieSameSite;
+
     @PostMapping("/events")
     public ResponseEntity<EventRecordedResponse> record(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -64,7 +67,7 @@ public class PublicAnalyticsController {
         return ResponseCookie.from(guestCookieName, guestKey)
                 .httpOnly(true)
                 .secure(guestCookieSecure)
-                .sameSite("Lax")
+                .sameSite(guestCookieSameSite)
                 .path("/")
                 .maxAge(Duration.ofSeconds(guestCookieMaxAgeSeconds))
                 .build();
