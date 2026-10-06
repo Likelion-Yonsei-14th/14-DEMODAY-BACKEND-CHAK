@@ -51,6 +51,9 @@ public class PublicDeskController {
     @Value("${chak.guest-cookie.secure}")
     private boolean guestCookieSecure;
 
+    @Value("${chak.guest-cookie.same-site:Lax}")
+    private String guestCookieSameSite;
+
     @GetMapping("/{supporterToken}")
     public ResponseEntity<PublicDeskResponse> getDesk(
             @PathVariable("supporterToken") String supporterToken,
@@ -126,7 +129,7 @@ public class PublicDeskController {
         return ResponseCookie.from(guestCookieName, guestKey)
                 .httpOnly(true)
                 .secure(guestCookieSecure)
-                .sameSite("Lax")
+                .sameSite(guestCookieSameSite)
                 .path("/")
                 .maxAge(Duration.ofSeconds(guestCookieMaxAgeSeconds))
                 .build();
