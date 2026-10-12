@@ -6,4 +6,8 @@ public record AuthTokenResponse(
         String tokenType,
         long expiresIn,
         UserResponse user) {
+
+    public AuthTokenResponse withoutRefreshToken() {
+        return new AuthTokenResponse(accessToken, null, tokenType, expiresIn, user);
+    }
 }

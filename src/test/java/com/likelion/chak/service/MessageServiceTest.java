@@ -170,6 +170,51 @@ class MessageServiceTest {
                 unlockAt);
     }
 
+    @Test
+    void cardElementLimitsArePerPage() {
+        PersonalDesk desk = createDesk(Instant.parse("2026-01-01T00:00:00Z"));
+        GuestSession guestSession = guestIdentityService.resolveOrCreate(null);
+
+        messageService.createGuestMessage(desk.getSupporterToken(), guestSession.getGuestIdentity(),
+                requestWithPage(elements(10), elements(10)));
+
+        for (String page : List.of(
+                "{\"stickerElements\": " + elements(11) + "}",
+                "{\"photoElements\": " + elements(11) + "}",
+                "{\"stickerElements\": \"not-an-array\"}",
+                "\"not-an-object\"")) {
+            assertThatThrownBy(() -> messageService.createGuestMessage(
+                    desk.getSupporterToken(), guestSession.getGuestIdentity(), requestWithRawPage(page)))
+                    .isInstanceOf(CustomException.class)
+                    .extracting(exception -> ((CustomException) exception).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_CARD_PAYLOAD);
+        }
+    }
+
+    private String elements(int count) {
+        return "[" + String.join(",", java.util.Collections.nCopies(count, "{\"id\": \"e\"}")) + "]";
+    }
+
+    private GuestMessageCreateRequest requestWithPage(String stickers, String photos) {
+        return requestWithRawPage("{\"stickerElements\": " + stickers + ", \"photoElements\": " + photos + "}");
+    }
+
+    private GuestMessageCreateRequest requestWithRawPage(String page) {
+        return objectMapper.readValue("""
+                {
+                  "nickname": "친구",
+                  "kind": "CARD",
+                  "visibility": "PUBLIC",
+                  "schemaVersion": 1,
+                  "card": {"pages": [%s]},
+                  "object": {
+                    "representationType": "LETTER",
+                    "x": 50, "y": 50, "rotation": 0, "scale": 1, "zIndex": 1
+                  }
+                }
+                """.formatted(page), GuestMessageCreateRequest.class);
+    }
+
     private GuestMessageCreateRequest request(
             String nickname,
             String visibility,
