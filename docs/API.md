@@ -329,6 +329,7 @@ https://kauth.kakao.com/oauth/authorize
 
 - `schemaVersion`: 현재 `1`만 허용
 - `CARD`: `card.pages` 1~3개, 각 페이지는 객체, 카드 전체 JSON 500,000자 이하
+- **비회원은 사진을 첨부할 수 없습니다.** 비회원 요청의 카드 어느 페이지에든 `photoElements`가 비어 있지 않으면 `403 GUEST_IMAGE_NOT_ALLOWED`입니다(빈 배열은 허용). 사진은 로그인한 회원만 첨부할 수 있고, 이미지 업로드 API(6장)도 로그인이 필요합니다.
 - 페이지당 `stickerElements` 최대 10개, `photoElements` 최대 10개(배열이어야 하며 초과 시 `INVALID_CARD_PAYLOAD`). 텍스트 요소는 개수 제한 없음(전체 크기 한도만 적용)
 - `STICKER`: 카드 본문 생략 가능
 - `x`, `y`: 0~100
@@ -889,6 +890,7 @@ GET  /api/public/unlocks                  [ { "category": "STATIONERY", "assetId
 | 401 | `INVALID_REFRESH_TOKEN` | 리프레시 토큰 오류 또는 누락(본문·쿠키 모두 없음) |
 | 401 | `EXPIRED_REFRESH_TOKEN` | 리프레시 토큰 만료 |
 | 403 | `FORBIDDEN` | 접근 권한 없음 |
+| 403 | `GUEST_IMAGE_NOT_ALLOWED` | 비회원이 사진이 포함된 카드를 보냄 |
 | 403 | `PUBLIC_FEED_DISABLED` | 공개 편지 목록 비활성화 |
 | 403 | `ADMIN_REQUIRED` | 운영자 권한 없음 |
 | 404 | `USER_NOT_FOUND` | 사용자 없음 |
@@ -927,6 +929,6 @@ GET  /api/public/unlocks                  [ { "category": "STATIONERY", "assetId
 - **교실 단위 응원**(교실·사물함·칠판·교실 Wrapped, 교실 상품 결제): Post-MVP 범위로 구현을 보류했습니다.
 - 책상 연결 코드(`다른 응원 공간 연결`), 친구를 위한 책상 만들기(Claim), 개인 Wrapped, 학생 혜택
 - 바구니에서 편지 꺼내기, 책상 주인의 편지 삭제 화면(삭제 API는 있음)
-- 이미지 삭제 및 미완료 업로드 정리 배치, 비회원 이미지 업로드
+- 이미지 삭제 및 미완료 업로드 정리 배치(비회원 이미지 첨부는 정책상 허용하지 않음)
 - 실제 결제 승인(PG 연동), 결제 환불, 알림 발송
 - 상세 분석 대시보드용 일별 집계 테이블

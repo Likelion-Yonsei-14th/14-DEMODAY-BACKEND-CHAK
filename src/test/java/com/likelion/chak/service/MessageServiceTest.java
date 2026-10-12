@@ -173,9 +173,10 @@ class MessageServiceTest {
     @Test
     void cardElementLimitsArePerPage() {
         PersonalDesk desk = createDesk(Instant.parse("2026-01-01T00:00:00Z"));
-        GuestSession guestSession = guestIdentityService.resolveOrCreate(null);
+        // 사진은 회원만 첨부할 수 있으므로 상한 검증은 회원으로 한다.
+        UserAccount member = userAccountRepository.save(UserAccount.createKakao("limits-member", "회원", null, null));
 
-        messageService.createGuestMessage(desk.getSupporterToken(), guestSession.getGuestIdentity(),
+        messageService.createUserMessage(desk.getSupporterToken(), member,
                 requestWithPage(elements(10), elements(10)));
 
         for (String page : List.of(
@@ -183,12 +184,32 @@ class MessageServiceTest {
                 "{\"photoElements\": " + elements(11) + "}",
                 "{\"stickerElements\": \"not-an-array\"}",
                 "\"not-an-object\"")) {
-            assertThatThrownBy(() -> messageService.createGuestMessage(
-                    desk.getSupporterToken(), guestSession.getGuestIdentity(), requestWithRawPage(page)))
+            assertThatThrownBy(() -> messageService.createUserMessage(
+                    desk.getSupporterToken(), member, requestWithRawPage(page)))
                     .isInstanceOf(CustomException.class)
                     .extracting(exception -> ((CustomException) exception).getErrorCode())
                     .isEqualTo(ErrorCode.INVALID_CARD_PAYLOAD);
         }
+    }
+
+    @Test
+    void guestCannotAttachPhotosButMemberCan() {
+        PersonalDesk desk = createDesk(Instant.parse("2026-01-01T00:00:00Z"));
+        GuestSession guestSession = guestIdentityService.resolveOrCreate(null);
+        String withPhoto = "{\"photoElements\": [{\"id\": \"p\", \"src\": \"x\"}]}";
+
+        assertThatThrownBy(() -> messageService.createGuestMessage(
+                desk.getSupporterToken(), guestSession.getGuestIdentity(), requestWithRawPage(withPhoto)))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GUEST_IMAGE_NOT_ALLOWED);
+
+        // 사진이 비어 있는 카드는 비회원도 보낼 수 있다.
+        messageService.createGuestMessage(desk.getSupporterToken(), guestSession.getGuestIdentity(),
+                requestWithRawPage("{\"photoElements\": []}"));
+
+        UserAccount member = userAccountRepository.save(UserAccount.createKakao("member-photo", "회원", null, null));
+        messageService.createUserMessage(desk.getSupporterToken(), member, requestWithRawPage(withPhoto));
     }
 
     private String elements(int count) {
