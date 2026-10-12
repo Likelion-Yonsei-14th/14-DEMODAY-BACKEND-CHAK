@@ -14,6 +14,7 @@ import com.likelion.chak.exception.ErrorCode;
 import com.likelion.chak.repository.PersonalDeskRepository;
 import com.likelion.chak.repository.UserAccountRepository;
 import com.likelion.chak.repository.MessageRepository;
+import com.likelion.chak.repository.PersonalMessageDeliveryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,8 @@ public class DeskService {
     private final PersonalDeskRepository personalDeskRepository;
     private final UserAccountRepository userAccountRepository;
     private final MessageRepository messageRepository;
+    private final PersonalMessageDeliveryRepository deliveryRepository;
+    private final UnlockTimeCalculator unlockTimeCalculator;
 
     @Transactional
     public OwnerDeskResponse createMyDesk(UserAccount owner, DeskCreateRequest request) {
@@ -73,6 +76,11 @@ public class DeskService {
                 request.publicFeedEnabled(),
                 request.defaultMessageVisibility());
 
+        if (request.pushEnabled() != null) {
+            desk.changePushEnabled(request.pushEnabled());
+        }
+        rescheduleLockedMessages(desk);
+
         if (request.applyVisibilityToExisting()) {
             messageRepository.updateVisibilityByDeskAndCreatedAtLessThanEqual(
                     desk.getId(),
@@ -81,6 +89,17 @@ public class DeskService {
                     Instant.now());
         }
         return OwnerDeskResponse.from(desk);
+    }
+
+    /**
+     * 공개 방식이 바뀌면 아직 열리지 않은 편지의 공개 시각을 새 설정으로 다시 계산한다.
+     * 이미 열린 편지는 다시 잠그지 않는다.
+     */
+    private void rescheduleLockedMessages(PersonalDesk desk) {
+        Instant now = Instant.now();
+        deliveryRepository.findAllByDeskAndUnlockAtAfterAndMessageStatusNot(desk, now, MessageStatus.DELETED)
+                .forEach(delivery -> delivery.reschedule(
+                        unlockTimeCalculator.calculate(desk, delivery.getMessage().getCreatedAt())));
     }
 
     @Transactional

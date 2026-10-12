@@ -21,10 +21,13 @@
 - 로그인 사용자의 개인 책상 생성·설정·접수 관리
 - 잠금 보호를 포함한 받은 편지 조회·읽음·삭제·바구니 이동
 - S3 presigned URL 이미지 업로드 및 완료 검증
-- 광고 기간·위치 관리와 노출·시청·클릭 기록
+- 광고 기간·위치 관리와 노출·시청·클릭 기록, 광고 시청으로 편지지·소품 해제
+- 반응·답장·신고·작성자 숨기기, 보낸 응원 목록과 삭제
+- 상품 가격표 기반 주문·승인(개발용 mock)과 유료 요소(아크릴 부적·보석) 결제 검증
+- 책상 설정 변경 시 아직 열리지 않은 편지의 공개 시각 재계산
 - 회원·비회원 트래픽 이벤트 및 운영자 집계
 
-교실 단위 응원은 Post-MVP 범위입니다.
+교실 단위 응원은 Post-MVP 범위이며 구현하지 않았습니다.
 
 ## Tech
 
@@ -62,7 +65,10 @@ export KAKAO_CLIENT_SECRET='your-client-secret-if-enabled'
 export JWT_SECRET='at-least-32-byte-production-secret'
 export S3_BUCKET='chak-media'
 export AWS_REGION='ap-northeast-2'
-export SPRING_PROFILES_ACTIVE=prod   # 운영: 기본 JWT 시크릿이면 기동 실패, 쿠키 Secure 기본 true, Swagger 기본 비활성
+# 개발: PAYMENT_PROVIDER 기본값은 mock(실제로 돈이 오가지 않는 가짜 결제)
+# 운영: 아래 프로필을 켜면 기본 JWT 시크릿으로는 기동 실패, 쿠키 Secure 기본 true, Swagger 기본 비활성,
+#       결제 기본값 none(승인 거부). 실제 PG 연동 전에는 결제를 열지 마세요.
+# export SPRING_PROFILES_ACTIVE=prod
 export ADMIN_KAKAO_IDS='123456789,987654321'
 ./gradlew bootRun
 ```
@@ -87,6 +93,13 @@ GET  /api/public/desks/{supporterToken}
 GET  /api/public/desks/{supporterToken}/messages?page=0&size=20
 POST /api/public/desks/{supporterToken}/messages
 GET  /api/public/health
+GET  /api/public/messages/mine
+DELETE /api/public/messages/{messageId}
+PUT  /api/public/messages/{messageId}/reaction
+POST /api/public/messages/{messageId}/report
+GET  /api/public/replies/mine
+POST /api/public/payments/orders
+POST /api/public/unlocks
 GET  /api/public/ads?placement=DESK
 POST /api/public/ads/{advertisementId}/events
 POST /api/public/analytics/events

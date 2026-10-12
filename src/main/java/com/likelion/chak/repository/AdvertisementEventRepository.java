@@ -18,6 +18,10 @@ public interface AdvertisementEventRepository extends JpaRepository<Advertisemen
             AdEventType eventType,
             String sessionId);
 
+    boolean existsByEventTypeAndSessionIdAndUserId(AdEventType eventType, String sessionId, Long userId);
+
+    boolean existsByEventTypeAndSessionIdAndGuestId(AdEventType eventType, String sessionId, Long guestId);
+
     long countByUserIdAndCreatedAtGreaterThanEqual(Long userId, Instant createdAt);
 
     long countByGuestIdAndCreatedAtGreaterThanEqual(Long guestId, Instant createdAt);

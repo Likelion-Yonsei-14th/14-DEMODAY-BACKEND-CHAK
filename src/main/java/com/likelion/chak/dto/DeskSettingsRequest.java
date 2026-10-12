@@ -16,5 +16,6 @@ public record DeskSettingsRequest(
         Instant capsuleUnlockAt,
         boolean publicFeedEnabled,
         @NotNull MessageVisibility defaultMessageVisibility,
-        boolean applyVisibilityToExisting) {
+        boolean applyVisibilityToExisting,
+        Boolean pushEnabled) {
 }

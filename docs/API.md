@@ -25,7 +25,7 @@
 | 경로 | 인증 |
 | --- | --- |
 | `POST /api/auth/kakao`, `POST /api/auth/refresh` | 불필요 |
-| `/api/public/**` | 선택 (Bearer가 있으면 회원으로 처리) |
+| `/api/public/**` | 선택 (Bearer가 있으면 회원, 없으면 `chak_guest_id` 쿠키의 비회원으로 처리) |
 | `POST /api/auth/logout`, `/api/users/**`, `/api/desks/me/**`, `/api/media/**` | 필수 |
 | `/api/admin/**` | 필수 + 운영자 |
 
@@ -33,7 +33,7 @@
 
 ### 프론트 통신 설정
 
-- **CORS**: 서버는 `CORS_ALLOWED_ORIGINS`(쉼표 구분, 기본 `http://localhost:3000,http://localhost:5173`)의 Origin만 허용합니다. 허용 메서드 `GET POST PATCH DELETE OPTIONS`, 허용 헤더 `Authorization`, `Content-Type`, 자격증명(쿠키) 허용. 와일드카드 불가. 배포 도메인은 백엔드 환경변수에 추가해야 합니다.
+- **CORS**: 서버는 `CORS_ALLOWED_ORIGINS`(쉼표 구분, 기본 `http://localhost:3000,http://localhost:5173`)의 Origin만 허용합니다. 허용 메서드 `GET POST PUT PATCH DELETE OPTIONS`, 허용 헤더 `Authorization`, `Content-Type`, 자격증명(쿠키) 허용. 와일드카드 불가. 배포 도메인은 백엔드 환경변수에 추가해야 합니다.
 - **비회원 쿠키 `chak_guest_id`**: HttpOnly, 1년, `Path=/`. 모든 `/api/public/**` 호출에 `credentials: "include"`(axios는 `withCredentials: true`)를 사용해야 합니다. JS에서 읽을 수 없습니다.
 - **쿠키 SameSite/Secure**: 기본 `SameSite=Lax`, `Secure=false`. 프론트와 API가 **다른 사이트(도메인)** 이면 쿠키가 전송되지 않으므로 백엔드에 `GUEST_COOKIE_SAME_SITE=None`, `GUEST_COOKIE_SECURE=true`(HTTPS 필수)를 설정합니다. 같은 사이트(서브도메인 포함)면 기본값을 유지합니다. 로컬 개발(`localhost` ↔ `localhost`)은 기본값으로 동작합니다.
 - **토큰 저장**:
@@ -56,8 +56,13 @@
 | DeskObjectType (`representationType`) | `MEMO`, `PHOTO_CARD`, `CHARM`, `POSTER_CARD`, `LETTER`, `TICKET`, `GENERIC_CARD`, `STICKER` |
 | MediaPurpose | `PROFILE`, `CARD` |
 | MediaStatus | `PENDING`, `UPLOADED` |
-| AdPlacement | `HOME`, `DESK`, `MESSAGE_COMPLETE` |
+| AdPlacement | `HOME`, `DESK`, `MESSAGE_COMPLETE`, `UNLOCK`(편지지·소품 해제용) |
 | AdEventType | `IMPRESSION`, `VIEW_STARTED`, `VIEW_COMPLETED`, `CLICK` |
+| ReactionType | `HEART`, `TEARY`, `CLAP` |
+| ReplyScope | `SINGLE`(이 편지만), `DAILY`(오늘 받은 편지 한 번에) |
+| ReportStatus | `OPEN`, `RESOLVED`, `DISMISSED` |
+| ProductCode | `CHARM_ACRYLIC`, `GEM`, `UNIVERSITY_CHARM`, `PENNANT`, `LOCKER_BULB`, `LOCKER_PAINT` |
+| UnlockCategory | `STATIONERY`(편지지), `DECOR`(클립·마스킹 테이프) |
 | TrafficEventType (클라이언트 전송 가능) | `PAGE_VIEW`, `MESSAGE_COMPOSE_STARTED` |
 
 잘못된 enum 값이나 JSON 파싱 오류는 `400 INVALID_REQUEST`입니다.
@@ -237,7 +242,7 @@ https://kauth.kakao.com/oauth/authorize
 
 인증: 불필요
 
-공개 시각이 지났고 `visibility=PUBLIC`이며 삭제되지 않은 편지만 최신순으로 반환합니다. 책상 주인이 공개 피드를 끄면 `403 PUBLIC_FEED_DISABLED`입니다.
+공개 시각이 지났고 `visibility=PUBLIC`이며 삭제되지 않은 편지만 최신순으로 반환합니다. 책상 주인이 숨긴 작성자([5.9](#59-숨긴-작성자-관리))의 편지는 제외됩니다. 책상 주인이 공개 피드를 끄면 `403 PUBLIC_FEED_DISABLED`입니다.
 
 응답 `200 OK`:
 
@@ -379,6 +384,7 @@ await fetch(`${API_URL}/api/public/desks/${supporterToken}/messages`, {
   "publicFeedEnabled": true,
   "defaultMessageVisibility": "PRIVATE",
   "roomClosed": false,
+  "pushEnabled": true,
   "createdAt": "2026-10-04T07:00:00Z",
   "updatedAt": "2026-10-04T07:00:00Z"
 }
@@ -402,11 +408,14 @@ await fetch(`${API_URL}/api/public/desks/${supporterToken}/messages`, {
   "capsuleUnlockAt": null,
   "publicFeedEnabled": false,
   "defaultMessageVisibility": "PRIVATE",
-  "applyVisibilityToExisting": true
+  "applyVisibilityToExisting": true,
+  "pushEnabled": true
 }
 ```
 
-`applyVisibilityToExisting=true`이면 삭제되지 않은 과거 편지를 `defaultMessageVisibility`로 일괄 변경합니다.
+- `applyVisibilityToExisting=true`이면 삭제되지 않은 과거 편지를 `defaultMessageVisibility`로 일괄 변경합니다.
+- `pushEnabled`는 생략하면 현재 값을 유지합니다. 새 응원 알림 선호만 저장하며 알림 발송 기능은 아직 없습니다.
+- **공개 시각 재계산**: 열람 방식(`readModeType`, `dailyUnlockTime`, `capsuleUnlockAt`)을 바꾸면 **아직 열리지 않은 편지**의 `unlockAt`이 새 설정으로 다시 계산됩니다. **이미 열린 편지는 다시 잠기지 않습니다.** 프론트는 편지의 `unlockAt`을 그대로 신뢰하고, 설정 값으로 다시 계산하지 마세요.
 
 ### 5.4 편지 접수 종료·재개
 
@@ -485,6 +494,58 @@ DELETE /api/desks/me/messages/{deliveryId}
 - 내 책상의 편지가 아니거나 삭제된 편지가 있으면 `404 MESSAGE_NOT_FOUND`입니다.
 - 응답 `200 OK`: 처리된 `OwnerMessageResponse` 배열(`basketedAt` 설정됨)
 - 바구니에서 꺼내는 API는 아직 없습니다.
+
+### 5.8 답장
+
+책상 주인이 받은 편지에 보내는 일방향 답장입니다. 한 편지에는 답장을 한 번만 보낼 수 있습니다.
+
+`POST /api/desks/me/replies`
+
+```json
+{
+  "scope": "SINGLE",
+  "sourceMessageId": 10,
+  "targetMessageIds": [10],
+  "text": "고마워! 덕분에 힘이 났어"
+}
+```
+
+- `scope=DAILY`는 프론트가 "오늘 받은 응원"의 대상 편지 ID를 모아 `targetMessageIds`로 보냅니다(1~100개).
+- 대상은 모두 내 책상의 **열린**, 삭제되지 않은 편지여야 합니다(아니면 `400 INVALID_REPLY`). 이미 답장한 편지가 있으면 `409 REPLY_ALREADY_EXISTS`입니다.
+- `text`는 1~500자입니다. 응답 `201 Created`:
+
+```json
+{
+  "id": 1,
+  "scope": "SINGLE",
+  "sourceMessageId": 10,
+  "targetMessageIds": [10],
+  "targetSenderNames": ["민준"],
+  "ownerName": "지수",
+  "text": "고마워! 덕분에 힘이 났어",
+  "createdAt": "2026-10-12T04:20:00Z"
+}
+```
+
+`GET /api/desks/me/replies`: 내가 보낸 답장 전체(최신순, 같은 응답 형식의 배열). 편지에 이미 답장했는지 표시할 때 사용합니다.
+
+### 5.9 숨긴 작성자 관리
+
+숨긴 작성자의 편지는 **내 받은 편지 목록과 공개 편지 목록에서 모두 빠집니다.** 작성자는 숨겨졌는지 알 수 없고 편지는 계속 접수됩니다. 작성자는 회원이면 계정, 비회원이면 쿠키 단위로 구분합니다(같은 이름이라도 다른 사람이면 따로 숨깁니다).
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/desks/me/supporters` | 내 책상에 편지를 남긴 작성자 목록 |
+| `POST /api/desks/me/blocks` | `{ "deliveryId": 21 }`의 작성자를 숨김. `201` (이미 숨겼다면 기존 항목 반환) |
+| `DELETE /api/desks/me/blocks/{blockId}` | 숨김 해제 |
+
+```json
+[
+  {"deliveryId": 21, "displayName": "민준", "messageCount": 2, "blocked": false, "blockId": null}
+]
+```
+
+`deliveryId`는 해당 작성자의 대표(가장 최근) 편지입니다. 삭제된 편지만 남긴 작성자는 목록에 나오지 않습니다.
 
 ## 6. 이미지 업로드 API
 
@@ -674,7 +735,143 @@ GET   /api/admin/analytics/summary?from={ISO_INSTANT}&to={ISO_INSTANT}
 
 `DELETE`는 이력을 유지한 채 광고를 비활성화합니다. 광고별 지표는 해당 광고의 노출·시청·클릭 건수를 반환합니다. 전체 분석 요약은 트래픽과 광고 이벤트 종류별 건수를 반환합니다. 조회 범위는 최대 366일이며 기간을 생략하면 최근 7일입니다.
 
-## 9. 전체 에러 코드
+### 8.1 신고 관리
+
+```text
+GET   /api/admin/reports?status=OPEN&page=0&size=20
+PATCH /api/admin/reports/{reportId}
+```
+
+`status` 기본값은 `OPEN`. `PATCH` 본문 `{ "action": "DISMISS" }`는 신고를 기각(`DISMISSED`), `{ "action": "REMOVE_MESSAGE" }`는 편지를 삭제 처리하고 신고를 해결(`RESOLVED`)로 표시합니다.
+
+```json
+{
+  "id": 1, "messageId": 1, "reason": "욕설", "status": "OPEN",
+  "messageAuthorDisplayName": "민준", "messageVisibility": "PUBLIC", "messageStatus": "READ",
+  "createdAt": "2026-10-12T04:22:47Z", "resolvedAt": null
+}
+```
+
+## 9. 보낸 응원·반응·신고 (작성자·방문자)
+
+모두 `/api/public/**`이며 로그인은 선택입니다. 회원은 Bearer, 비회원은 `chak_guest_id` 쿠키(`credentials: "include"`)로 본인을 식별합니다. 신원을 확인할 수 없으면 `401 IDENTITY_REQUIRED`(조회 API는 빈 결과)입니다.
+
+### 9.1 내가 보낸 응원
+
+`GET /api/public/messages/mine?page=0&size=20`
+
+내가 쓴 편지(삭제 제외)를 최신순으로 반환합니다. `page`는 0부터, `size`는 1~100입니다.
+
+```json
+{
+  "content": [
+    {
+      "messageId": 10,
+      "deskName": "지수",
+      "supporterToken": "550e8400-e29b-41d4-a716-446655440000",
+      "kind": "CARD",
+      "visibility": "PUBLIC",
+      "status": "SENT",
+      "deletable": true,
+      "schemaVersion": 1,
+      "card": {"pages": []},
+      "object": {},
+      "unlockAt": "2026-10-12T13:00:00Z",
+      "readAt": null,
+      "createdAt": "2026-10-12T03:26:13Z"
+    }
+  ],
+  "page": 0, "size": 20, "hasNext": false
+}
+```
+
+`deletable`은 공개 편지이면서 아직 열어보지 않은 경우(`status=SENT`)입니다.
+
+### 9.2 내 편지 삭제
+
+`DELETE /api/public/messages/{messageId}` → `200 {"message": "편지가 삭제되었습니다."}`
+
+내가 쓴 **공개 편지이면서 책상 주인이 아직 읽지 않은** 편지만 삭제할 수 있습니다. 남의 편지는 `404 MESSAGE_NOT_FOUND`, 이미 읽혔거나 비공개이면 `409 MESSAGE_NOT_DELETABLE`입니다. 삭제는 soft delete입니다.
+
+### 9.3 반응
+
+한 사람은 한 편지에 하나의 반응만 남길 수 있고, 다른 반응을 보내면 바뀝니다.
+
+| API | 설명 |
+| --- | --- |
+| `PUT /api/public/messages/{messageId}/reaction` | `{ "type": "HEART" }` → `{ "messageId": 10, "myReaction": "HEART" }` |
+| `DELETE /api/public/messages/{messageId}/reaction` | 반응 취소 |
+| `GET /api/public/messages/reactions?ids=10,11` | 내가 남긴 반응 `{ "10": "HEART" }` (반응 없는 편지는 생략, 최대 200개) |
+
+반응할 수 있는 편지: ① 책상 주인은 열린 모든 편지 ② 그 밖의 사람은 열렸고 `PUBLIC`이며 공개 목록이 켜져 있고 주인이 숨기지 않은 작성자의 편지. 그 외는 존재하지 않는 것처럼 `404 MESSAGE_NOT_FOUND`입니다.
+
+### 9.4 신고
+
+`POST /api/public/messages/{messageId}/report` `{ "reason": "욕설" }`(본문·`reason`은 선택, 최대 100자) → `201`
+
+반응과 같은 접근 규칙이 적용되며, 같은 사람이 같은 편지를 여러 번 신고해도 한 번만 접수됩니다. 처리는 [8.1 신고 관리](#81-신고-관리)에서 합니다.
+
+### 9.5 내 편지에 달린 답장
+
+`GET /api/public/replies/mine`
+
+내가 보낸 편지에 책상 주인이 답장한 목록입니다(최신순, [5.8](#58-답장)과 같은 형식). `targetMessageIds`·`targetSenderNames`에는 **내 편지만** 들어갑니다.
+
+## 10. 결제와 광고 해제
+
+### 10.1 결제
+
+서버가 상품 단가를 가지고 있으며 **주문 금액은 항상 서버가 계산**합니다. 프론트의 표시 가격은 아래와 같아야 합니다.
+
+| ProductCode | 단가(원) | 사용처 |
+| --- | --- | --- |
+| `CHARM_ACRYLIC` | 50 | 책상 부적 · 아크릴 3D |
+| `GEM` | 5 | 보석 스티커(개당) |
+| `UNIVERSITY_CHARM` | 150 | 교실 대학 굿즈 부적 (교실 기능과 함께 제공 예정) |
+| `PENNANT` | 150 | 교실 대학 깃발 (교실 기능과 함께 제공 예정) |
+| `LOCKER_BULB` | 200 | 교실 사물함 전구 (교실 기능과 함께 제공 예정) |
+| `LOCKER_PAINT` | 200 | 교실 사물함 페인트 (교실 기능과 함께 제공 예정) |
+
+흐름: ① 주문 생성 → ② 승인(confirm) → ③ 결제한 `orderId`를 편지 전송에 첨부.
+
+```text
+POST /api/public/payments/orders               주문 생성
+POST /api/public/payments/orders/{id}/confirm  승인 (본인 주문만)
+GET  /api/public/payments/orders/{id}          주문 조회
+```
+
+```json
+{ "items": [ {"code": "CHARM_ACRYLIC"}, {"code": "GEM", "quantity": 2} ] }
+```
+
+응답: `{ "orderId": 1, "status": "PAID", "totalAmount": 60, "consumed": false, "items": [...], "createdAt": "...", "paidAt": "..." }`. 항목은 최대 20개, 수량은 1~100입니다. 다른 사람의 주문은 `404 ORDER_NOT_FOUND`입니다.
+
+**편지 전송 시 결제 검증**: 편지 작성 요청(4.3)의 `object.metadata`에 `"material": "acrylic"` 또는 `gems` 배열이 있으면 서버가 필요한 상품(`CHARM_ACRYLIC` 1개, `GEM` 보석 개수)을 계산하고, 요청의 `paymentOrderId`가 **결제 완료된 본인 주문**이며 해당 항목을 모두 포함하는지 확인합니다. 주문은 한 번만 쓸 수 있습니다.
+
+| 상태 | 코드 | 의미 |
+| --- | --- | --- |
+| 402 | `PAYMENT_REQUIRED` | 주문이 없거나 결제 전이거나 필요한 항목을 포함하지 않음 |
+| 409 | `ORDER_ALREADY_USED` | 이미 사용한 주문 |
+| 503 | `PAYMENT_NOT_CONFIGURED` | 승인 수단이 설정되지 않음 |
+
+> **승인 수단**: 현재는 실제로 돈이 오가지 않는 **mock 승인**(`PAYMENT_PROVIDER=mock`, 로컬·개발 기본값)만 있습니다. `prod` 프로필의 기본값은 `none`이라 승인이 `503`으로 거부됩니다. 실제 결제는 PG(예: 토스페이먼츠) 선택과 사업자 설정 후 `PaymentProvider`를 구현해 연결해야 합니다. 한 주문으로 여러 편지를 결제하거나 환불하는 기능은 아직 없습니다.
+
+### 10.2 광고 시청으로 해제
+
+광고를 끝까지 본 사람이 편지지·클립·마스킹 테이프를 해제합니다. 해제한 목록은 본인(회원 또는 같은 쿠키의 비회원)에게만 적용됩니다.
+
+```text
+GET  /api/public/ads?placement=UNLOCK     해제용 광고 조회 (7.1)
+POST /api/public/ads/{id}/events          IMPRESSION → VIEW_STARTED → VIEW_COMPLETED (7.2, 같은 sessionId)
+POST /api/public/unlocks                  { "category": "STATIONERY", "assetId": "bg-lace", "adSessionId": "..." }
+GET  /api/public/unlocks                  [ { "category": "STATIONERY", "assetId": "bg-lace" } ]
+```
+
+- `placement=UNLOCK` 광고가 **하나라도 노출 중이면** 요청의 `adSessionId`로 같은 사람이 `VIEW_COMPLETED` 이벤트를 보낸 기록이 있어야 하며, 없으면 `403 AD_NOT_COMPLETED`입니다.
+- 노출 중인 해제용 광고가 **없으면** 사용자를 막지 않기 위해 광고 없이 해제됩니다.
+- 이미 해제한 항목을 다시 요청해도 성공(멱등)입니다.
+
+## 11. 전체 에러 코드
 
 | HTTP | 코드 | 설명 |
 | --- | --- | --- |
@@ -702,6 +899,18 @@ GET   /api/admin/analytics/summary?from={ISO_INSTANT}&to={ISO_INSTANT}
 | 409 | `DESK_CLOSED` | 편지 접수 종료 |
 | 409 | `DESK_ALREADY_EXISTS` | 계정에 이미 책상이 있음 |
 | 409 | `MESSAGE_NOT_READ` | 읽지 않은 편지를 바구니로 이동 시도 |
+| 409 | `MESSAGE_NOT_DELETABLE` | 이미 읽혔거나 공개 편지가 아니어서 작성자가 삭제할 수 없음 |
+| 401 | `IDENTITY_REQUIRED` | 작성자를 확인할 수 없음(로그인 또는 비회원 쿠키 필요) |
+| 409 | `REPLY_ALREADY_EXISTS` | 이미 답장한 편지가 포함됨 |
+| 400 | `INVALID_REPLY` | 답장 대상(내 책상의 열린 편지가 아님) 또는 내용 오류 |
+| 404 | `BLOCK_NOT_FOUND` | 숨긴 작성자를 찾을 수 없음 |
+| 404 | `REPORT_NOT_FOUND` | 신고를 찾을 수 없음 |
+| 402 | `PAYMENT_REQUIRED` | 결제가 필요하거나 주문이 항목을 포함하지 않음 |
+| 400 | `INVALID_ORDER` | 주문 항목 오류 |
+| 404 | `ORDER_NOT_FOUND` | 본인의 주문이 아님 |
+| 409 | `ORDER_ALREADY_USED` | 이미 사용한 결제 |
+| 503 | `PAYMENT_NOT_CONFIGURED` | 결제 승인 수단 미설정 |
+| 403 | `AD_NOT_COMPLETED` | 광고 시청 완료 기록이 없음 |
 | 409 | `MESSAGE_LOCKED` | 공개 시각 전 읽기 요청 |
 | 409 | `MEDIA_UPLOAD_NOT_FOUND` | S3에서 업로드 결과를 찾지 못함 |
 | 429 | `TOO_MANY_EVENTS` | 이벤트 요청 한도 초과 |
@@ -713,10 +922,11 @@ GET   /api/admin/analytics/summary?from={ISO_INSTANT}&to={ISO_INSTANT}
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | `application/json`이 아닌 Content-Type |
 | 500 | `INTERNAL_SERVER_ERROR` | 서버 내부 오류 |
 
-## 10. 아직 제공하지 않는 API
+## 12. 아직 제공하지 않는 API
 
-- 교실 단위 응원
-- 이미지 삭제 및 미완료 업로드 정리 배치
+- **교실 단위 응원**(교실·사물함·칠판·교실 Wrapped, 교실 상품 결제): Post-MVP 범위로 구현을 보류했습니다.
+- 책상 연결 코드(`다른 응원 공간 연결`), 친구를 위한 책상 만들기(Claim), 개인 Wrapped, 학생 혜택
+- 바구니에서 편지 꺼내기, 책상 주인의 편지 삭제 화면(삭제 API는 있음)
+- 이미지 삭제 및 미완료 업로드 정리 배치, 비회원 이미지 업로드
+- 실제 결제 승인(PG 연동), 결제 환불, 알림 발송
 - 상세 분석 대시보드용 일별 집계 테이블
-
-교실 기능은 Post-MVP 범위입니다.

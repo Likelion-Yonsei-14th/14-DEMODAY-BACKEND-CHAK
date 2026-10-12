@@ -72,13 +72,37 @@ class OwnerDeskServiceTest {
                 Instant.parse("2026-01-01T00:00:00Z"),
                 true,
                 MessageVisibility.PRIVATE,
-                true));
+                true,
+                null));
 
         List<OwnerMessageResponse> messages = messageService.getOwnerMessages(owner.getId(), true);
         assertThat(messages).singleElement()
                 .extracting(OwnerMessageResponse::visibility)
                 .isEqualTo(MessageVisibility.PRIVATE);
         assertThat(messageService.getPublicMessages(desk.getSupporterToken())).isEmpty();
+    }
+
+    @Test
+    void changingReadModeReschedulesOnlyMessagesThatAreStillLocked() {
+        UserAccount owner = saveUser("owner-reschedule");
+        deskService.createMyDesk(owner, createRequest(Instant.parse("2099-01-01T00:00:00Z")));
+        PersonalDesk desk = deskService.findByOwnerId(owner.getId());
+        createGuestMessage(desk, "PRIVATE");
+        assertThat(messageService.getOwnerMessages(owner.getId(), true).get(0).locked()).isTrue();
+
+        // 캡슐 시각을 과거로 바꾸면 잠겨 있던 편지가 열린다.
+        deskService.updateMyDesk(owner.getId(), new DeskSettingsRequest(
+                "책상", ReadModeType.TIME_CAPSULE, null, Instant.parse("2026-01-01T00:00:00Z"),
+                true, MessageVisibility.PRIVATE, false, true));
+        OwnerMessageResponse opened = messageService.getOwnerMessages(owner.getId(), true).get(0);
+        assertThat(opened.locked()).isFalse();
+
+        // 이미 열린 편지는 설정을 미래로 바꿔도 다시 잠기지 않는다.
+        deskService.updateMyDesk(owner.getId(), new DeskSettingsRequest(
+                "책상", ReadModeType.TIME_CAPSULE, null, Instant.parse("2099-01-01T00:00:00Z"),
+                true, MessageVisibility.PRIVATE, false, false));
+        assertThat(messageService.getOwnerMessages(owner.getId(), true).get(0).locked()).isFalse();
+        assertThat(deskService.getMyDesk(owner.getId()).pushEnabled()).isFalse();
     }
 
     @Test

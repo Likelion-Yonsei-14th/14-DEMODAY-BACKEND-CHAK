@@ -69,6 +69,10 @@ public class PersonalMessageDelivery {
         return new PersonalMessageDelivery(message, desk, unlockAt, preclaimBacklog);
     }
 
+    public void reschedule(Instant unlockAt) {
+        this.unlockAt = unlockAt;
+    }
+
     public boolean isUnlocked(Instant now) {
         return !unlockAt.isAfter(now);
     }

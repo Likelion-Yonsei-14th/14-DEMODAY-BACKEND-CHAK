@@ -65,6 +65,9 @@ public class PersonalDesk {
     private MessageVisibility defaultMessageVisibility;
 
     @Column(nullable = false)
+    private boolean pushEnabled = true;
+
+    @Column(nullable = false)
     private boolean roomClosed;
 
     @Column(nullable = false, unique = true, updatable = false, length = 36)
@@ -151,6 +154,10 @@ public class PersonalDesk {
         this.capsuleUnlockAt = capsuleUnlockAt;
         this.publicFeedEnabled = publicFeedEnabled;
         this.defaultMessageVisibility = defaultMessageVisibility;
+    }
+
+    public void changePushEnabled(boolean pushEnabled) {
+        this.pushEnabled = pushEnabled;
     }
 
     @PrePersist

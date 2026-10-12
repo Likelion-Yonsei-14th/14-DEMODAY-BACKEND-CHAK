@@ -17,6 +17,7 @@ public record OwnerDeskResponse(
         boolean publicFeedEnabled,
         MessageVisibility defaultMessageVisibility,
         boolean roomClosed,
+        boolean pushEnabled,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -31,6 +32,7 @@ public record OwnerDeskResponse(
                 desk.isPublicFeedEnabled(),
                 desk.getDefaultMessageVisibility(),
                 desk.isRoomClosed(),
+                desk.isPushEnabled(),
                 desk.getCreatedAt(),
                 desk.getUpdatedAt());
     }

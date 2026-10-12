@@ -10,6 +10,9 @@
 | V1 | 기본 스키마 (users, guest_identities, personal_desks, messages, personal_message_deliveries, desk_objects, refresh_tokens) |
 | V2 | `personal_desks.owner_id` 유니크 (계정당 개인 책상 1개) |
 | V3 | `users.admin`, `personal_desks.default_message_visibility`, media_assets, advertisements, advertisement_events, traffic_events, 배달 인덱스 |
+| V4 | `personal_desks.push_enabled` |
+| V5 | message_reactions, message_replies, message_reply_targets, message_reports, desk_blocks, 작성자 조회 인덱스 |
+| V6 | payment_orders, payment_order_items, ad_unlocks |
 
 ## 관계도
 
@@ -62,6 +65,7 @@ traffic_events (user 또는 guest, FK 없는 resource_key)
 | public_feed_enabled | BOOLEAN | 공개 편지 목록 허용 |
 | default_message_visibility | VARCHAR(20) | `PUBLIC` / `PRIVATE`, 기본 PRIVATE |
 | room_closed | BOOLEAN | 접수 종료 |
+| push_enabled | BOOLEAN | 새 응원 알림 선호 (V4, 기본 TRUE) |
 | supporter_token | VARCHAR(36) | UNIQUE, 공유 링크 토큰(UUID) |
 | created_at, updated_at | DATETIME(6) | |
 
@@ -181,3 +185,63 @@ UNIQUE `(advertisement_id, event_type, session_id)` — 재시도 중복 방지.
 인덱스: `(event_type, created_at)`, `(user_id, created_at)`, `(guest_id, created_at)`
 
 원문 IP와 User-Agent는 저장하지 않는다.
+
+## 커뮤니티 (V5)
+
+### message_reactions
+한 사람이 한 편지에 하나의 반응.
+
+| 컬럼 | 타입 | 비고 |
+| --- | --- | --- |
+| id | BIGINT PK | |
+| message_id | BIGINT FK messages | |
+| user_id / guest_id | BIGINT FK | 둘 중 하나. UNIQUE `(message_id, user_id)`, `(message_id, guest_id)` |
+| reaction_type | VARCHAR(20) | `HEART` `TEARY` `CLAP` |
+| created_at, updated_at | DATETIME(6) | |
+
+### message_replies / message_reply_targets
+책상 주인의 일방향 답장. 한 답장이 여러 편지(오늘의 응원 전체)를 대상으로 할 수 있고, 편지당 답장은 하나다.
+
+| 테이블 | 컬럼 | 비고 |
+| --- | --- | --- |
+| message_replies | id, desk_id FK, owner_user_id FK, scope(`SINGLE`/`DAILY`), source_message_id FK(NULL 가능), reply_text(≤500), created_at | |
+| message_reply_targets | id, reply_id FK, message_id FK | UNIQUE `message_id` (편지당 답장 1개) |
+
+### message_reports
+| 컬럼 | 타입 | 비고 |
+| --- | --- | --- |
+| id | BIGINT PK | |
+| message_id | BIGINT FK | |
+| reporter_user_id / reporter_guest_id | BIGINT FK | 둘 중 하나. UNIQUE `(message_id, reporter_*)` |
+| reason | VARCHAR(100) | NULL 가능 |
+| status | VARCHAR(20) | `OPEN` `RESOLVED` `DISMISSED` |
+| created_at, resolved_at | DATETIME(6) | 인덱스 `(status, created_at)` |
+
+### desk_blocks
+책상 주인이 숨긴 작성자.
+
+| 컬럼 | 타입 | 비고 |
+| --- | --- | --- |
+| id | BIGINT PK | API의 `blockId` |
+| desk_id | BIGINT FK | |
+| author_user_id / author_guest_id | BIGINT FK | 둘 중 하나. UNIQUE `(desk_id, author_*)` |
+| display_name | VARCHAR(50) | 숨길 때의 표시 이름 |
+| created_at | DATETIME(6) | |
+
+## 결제·해제 (V6)
+
+### payment_orders / payment_order_items
+| 테이블 | 컬럼 | 비고 |
+| --- | --- | --- |
+| payment_orders | id, payer_user_id / payer_guest_id, total_amount(원), status(`CREATED` `PAID` `CANCELED`), provider(`MOCK` `NONE` …), provider_ref, consumed_at, created_at, paid_at | `consumed_at`이 있으면 이미 사용한 주문 |
+| payment_order_items | id, order_id FK, item_code(ProductCode), item_ref, quantity, unit_price, amount | 단가는 서버 `ProductCode` 기준으로 주문 시점 값을 저장 |
+
+### ad_unlocks
+| 컬럼 | 타입 | 비고 |
+| --- | --- | --- |
+| id | BIGINT PK | |
+| user_id / guest_id | BIGINT FK | 둘 중 하나. UNIQUE `(user_id, category, asset_id)`, `(guest_id, category, asset_id)` |
+| category | VARCHAR(20) | `STATIONERY` `DECOR` |
+| asset_id | VARCHAR(100) | 프론트 에셋 식별자 |
+| ad_session_id | VARCHAR(100) | 해제에 쓴 광고 노출 식별자 |
+| created_at | DATETIME(6) | |
