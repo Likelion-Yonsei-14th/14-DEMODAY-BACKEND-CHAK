@@ -40,6 +40,8 @@ public class MessageService {
 
     private static final int CURRENT_SCHEMA_VERSION = 1;
     private static final int MAX_CARD_PAYLOAD_LENGTH = 500_000;
+    private static final int MAX_STICKERS_PER_PAGE = 10;
+    private static final int MAX_PHOTOS_PER_PAGE = 10;
     private static final Instant MAX_UNLOCK_BOUND = Instant.parse("9999-01-01T00:00:00Z");
 
     private final DeskService deskService;
@@ -304,6 +306,22 @@ public class MessageService {
             throw new CustomException(ErrorCode.INVALID_CARD_PAYLOAD);
         }
         if (card.toString().length() > MAX_CARD_PAYLOAD_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_CARD_PAYLOAD);
+        }
+        for (JsonNode page : pages) {
+            if (!page.isObject()) {
+                throw new CustomException(ErrorCode.INVALID_CARD_PAYLOAD);
+            }
+            validateElementArray(page.get("stickerElements"), MAX_STICKERS_PER_PAGE);
+            validateElementArray(page.get("photoElements"), MAX_PHOTOS_PER_PAGE);
+        }
+    }
+
+    private void validateElementArray(JsonNode elements, int maxSize) {
+        if (elements == null || elements.isNull()) {
+            return;
+        }
+        if (!elements.isArray() || elements.size() > maxSize) {
             throw new CustomException(ErrorCode.INVALID_CARD_PAYLOAD);
         }
     }

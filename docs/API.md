@@ -36,7 +36,11 @@
 - **CORS**: 서버는 `CORS_ALLOWED_ORIGINS`(쉼표 구분, 기본 `http://localhost:3000,http://localhost:5173`)의 Origin만 허용합니다. 허용 메서드 `GET POST PATCH DELETE OPTIONS`, 허용 헤더 `Authorization`, `Content-Type`, 자격증명(쿠키) 허용. 와일드카드 불가. 배포 도메인은 백엔드 환경변수에 추가해야 합니다.
 - **비회원 쿠키 `chak_guest_id`**: HttpOnly, 1년, `Path=/`. 모든 `/api/public/**` 호출에 `credentials: "include"`(axios는 `withCredentials: true`)를 사용해야 합니다. JS에서 읽을 수 없습니다.
 - **쿠키 SameSite/Secure**: 기본 `SameSite=Lax`, `Secure=false`. 프론트와 API가 **다른 사이트(도메인)** 이면 쿠키가 전송되지 않으므로 백엔드에 `GUEST_COOKIE_SAME_SITE=None`, `GUEST_COOKIE_SECURE=true`(HTTPS 필수)를 설정합니다. 같은 사이트(서브도메인 포함)면 기본값을 유지합니다. 로컬 개발(`localhost` ↔ `localhost`)은 기본값으로 동작합니다.
-- **토큰 저장**: access/refresh 토큰은 응답 본문으로만 전달됩니다(쿠키 아님). 프론트가 저장하고 Bearer 헤더로 전송합니다.
+- **토큰 저장**:
+  - access 토큰은 응답 본문으로 전달되며 **메모리에만 보관**하고 Bearer 헤더로 전송합니다(local/sessionStorage 저장 금지).
+  - refresh 토큰은 `chak_refresh_token` **HttpOnly 쿠키**(`Path=/api/auth`)로도 내려갑니다. 쿠키로 받으면 JS가 다룰 필요가 없습니다.
+  - 전환 기간에는 응답 본문의 `refreshToken`도 함께 내려가며(서버 설정 `REFRESH_TOKEN_IN_BODY=true`), 쿠키 방식이 안정되면 본문에서 제거됩니다(`refreshToken: null`). 프론트는 본문 값에 의존하지 마세요.
+  - 새로고침으로 메모리의 access 토큰이 사라지면 앱 시작 시 `POST /api/auth/refresh`(본문 없이, `credentials: "include"`)를 호출해 복구합니다. 쿠키도 없으면 `401 INVALID_REFRESH_TOKEN`이며 비로그인 상태로 처리합니다.
 - **에러 응답**: 404·405·415를 포함한 모든 에러는 `{ "code", "message" }` 형식이며 필드별 검증 상세는 없습니다. 프론트는 `code`로 분기하세요.
 - **JSON 필드 이름**: camelCase. 알 수 없는 필드는 무시, `null`은 허용되는 필드에서만 사용.
 - **이미지 업로드**: S3로 직접 `PUT`하므로 S3 버킷 CORS에 프론트 Origin, `PUT` 메서드, `Content-Type` 헤더를 허용해야 합니다(백엔드 CORS와 별개).
@@ -107,7 +111,7 @@ https://kauth.kakao.com/oauth/authorize
 }
 ```
 
-응답 `200 OK`:
+응답 `200 OK` (헤더에 `Set-Cookie: chak_refresh_token=...; HttpOnly; Path=/api/auth` 포함):
 
 ```json
 {
@@ -141,7 +145,7 @@ https://kauth.kakao.com/oauth/authorize
 
 인증: 불필요
 
-요청:
+요청: **본문 없이 쿠키만 보내는 방식(권장)** 또는 본문으로 토큰 전달. 둘 다 있으면 본문이 우선입니다.
 
 ```json
 {
@@ -149,7 +153,11 @@ https://kauth.kakao.com/oauth/authorize
 }
 ```
 
-응답 `200 OK`: 카카오 로그인 응답과 같은 새 토큰 쌍
+- 쿠키 방식은 `credentials: "include"`가 필요합니다.
+- 쿠키로 받은 요청에 `Origin` 헤더가 있으면 허용된 프론트 Origin이어야 하며 아니면 `403`입니다(CSRF 방어).
+- 본문·쿠키 모두 없으면 `401 INVALID_REFRESH_TOKEN`입니다.
+
+응답 `200 OK`: 카카오 로그인 응답과 같은 새 토큰 쌍(쿠키도 새 값으로 교체됨)
 
 재발급에 사용한 기존 리프레시 토큰은 즉시 폐기됩니다. 프론트는 응답받은 액세스 토큰과 리프레시 토큰을 모두 교체해야 합니다.
 
@@ -166,15 +174,9 @@ https://kauth.kakao.com/oauth/authorize
 
 인증: 필수
 
-요청:
+요청: 재발급과 같이 본문 또는 쿠키로 리프레시 토큰을 전달합니다.
 
-```json
-{
-  "refreshToken": "opaque-refresh-token"
-}
-```
-
-응답 `200 OK`:
+응답 `200 OK` (리프레시 쿠키 삭제 헤더 포함):
 
 ```json
 {
@@ -321,7 +323,8 @@ https://kauth.kakao.com/oauth/authorize
 검증 규칙:
 
 - `schemaVersion`: 현재 `1`만 허용
-- `CARD`: `card.pages` 1~3개
+- `CARD`: `card.pages` 1~3개, 각 페이지는 객체, 카드 전체 JSON 500,000자 이하
+- 페이지당 `stickerElements` 최대 10개, `photoElements` 최대 10개(배열이어야 하며 초과 시 `INVALID_CARD_PAYLOAD`). 텍스트 요소는 개수 제한 없음(전체 크기 한도만 적용)
 - `STICKER`: 카드 본문 생략 가능
 - `x`, `y`: 0~100
 - `scale`: 0 초과 3 이하
@@ -686,7 +689,7 @@ GET   /api/admin/analytics/summary?from={ISO_INSTANT}&to={ISO_INSTANT}
 | 400 | `INVALID_ANALYTICS_EVENT` | 분석 이벤트 또는 조회 기간 오류 |
 | 401 | `UNAUTHORIZED` | 액세스 토큰 누락, 만료 또는 변조 |
 | 401 | `INVALID_KAKAO_AUTH_CODE` | 카카오 인가 코드 오류 |
-| 401 | `INVALID_REFRESH_TOKEN` | 리프레시 토큰 오류 |
+| 401 | `INVALID_REFRESH_TOKEN` | 리프레시 토큰 오류 또는 누락(본문·쿠키 모두 없음) |
 | 401 | `EXPIRED_REFRESH_TOKEN` | 리프레시 토큰 만료 |
 | 403 | `FORBIDDEN` | 접근 권한 없음 |
 | 403 | `PUBLIC_FEED_DISABLED` | 공개 편지 목록 비활성화 |
