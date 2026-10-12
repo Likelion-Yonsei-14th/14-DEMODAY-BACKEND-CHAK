@@ -50,6 +50,18 @@ class ApiBasicsTest {
     }
 
     @Test
+    void corsPreflightAllowsPutForReactions() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .options("/api/public/messages/1/reaction")
+                        .header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "PUT")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Access-Control-Allow-Methods", org.hamcrest.Matchers.containsString("PUT")));
+    }
+
+    @Test
     void protectedPathWithoutTokenReturns401Json() throws Exception {
         mockMvc.perform(get("/api/desks/me"))
                 .andExpect(status().isUnauthorized())

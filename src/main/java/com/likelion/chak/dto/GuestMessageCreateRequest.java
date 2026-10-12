@@ -16,4 +16,6 @@ public class GuestMessageCreateRequest {
     private Integer schemaVersion;
     private JsonNode card;
     private DeskObjectRequest object;
+    /** 아크릴 부적·보석 스티커 등 유료 요소가 있을 때 결제 완료된 주문 번호. */
+    private Long paymentOrderId;
 }

@@ -9,6 +9,11 @@ import com.likelion.chak.dto.MessageResponseBody;
 import com.likelion.chak.service.AdvertisementService;
 import com.likelion.chak.service.AnalyticsService;
 import com.likelion.chak.service.AuthService;
+import com.likelion.chak.service.ReportAdminService;
+import com.likelion.chak.domain.ReportStatus;
+import com.likelion.chak.dto.CommunityDtos.ReportActionRequest;
+import com.likelion.chak.dto.CommunityDtos.ReportResponse;
+import com.likelion.chak.dto.SliceResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +42,7 @@ public class AdminController {
     private final AuthService authService;
     private final AdvertisementService advertisementService;
     private final AnalyticsService analyticsService;
+    private final ReportAdminService reportAdminService;
 
     @GetMapping("/ads")
     public ResponseEntity<List<AdvertisementResponse>> getAdvertisements(
@@ -88,5 +94,24 @@ public class AdminController {
             @RequestParam(name = "to", required = false) Instant to) {
         authService.getAdmin(principal.userId());
         return ResponseEntity.ok(analyticsService.summary(from, to));
+    }
+
+    @GetMapping("/reports")
+    public ResponseEntity<SliceResponse<ReportResponse>> getReports(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(name = "status", required = false) ReportStatus status,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(reportAdminService.list(status, page, size));
+    }
+
+    @PatchMapping("/reports/{reportId}")
+    public ResponseEntity<ReportResponse> actOnReport(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("reportId") Long reportId,
+            @Valid @RequestBody ReportActionRequest request) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(reportAdminService.act(reportId, request.action()));
     }
 }

@@ -9,6 +9,7 @@ import com.likelion.chak.domain.MessageStatus;
 import com.likelion.chak.domain.MessageVisibility;
 import com.likelion.chak.domain.PersonalDesk;
 import com.likelion.chak.domain.PersonalMessageDelivery;
+import com.likelion.chak.domain.ProductCode;
 import com.likelion.chak.domain.UserAccount;
 import com.likelion.chak.dto.DeskObjectRequest;
 import com.likelion.chak.dto.GuestMessageCreateRequest;
@@ -29,6 +30,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -50,6 +52,7 @@ public class MessageService {
     private final PersonalMessageDeliveryRepository deliveryRepository;
     private final DeskObjectRepository deskObjectRepository;
     private final ObjectMapper objectMapper;
+    private final PaymentService paymentService;
 
     @Transactional
     public MessageResponse createGuestMessage(
@@ -59,6 +62,8 @@ public class MessageService {
         PersonalDesk desk = deskService.findBySupporterTokenForUpdate(supporterToken);
         validateDeskOpen(desk);
         validateRequest(request, true);
+        paymentService.consume(new CallerIdentity(null, guestIdentity),
+                request.getPaymentOrderId(), requiredPurchases(request));
 
         MessageVisibility visibility = resolveVisibility(desk, request.getVisibility());
         Message message = Message.createByGuest(
@@ -80,6 +85,8 @@ public class MessageService {
         PersonalDesk desk = deskService.findBySupporterTokenForUpdate(supporterToken);
         validateDeskOpen(desk);
         validateRequest(request, false);
+        paymentService.consume(new CallerIdentity(user, null),
+                request.getPaymentOrderId(), requiredPurchases(request));
 
         MessageVisibility visibility = resolveVisibility(desk, request.getVisibility());
         Message message = Message.createByUser(
@@ -141,7 +148,7 @@ public class MessageService {
         }
 
         Slice<PersonalMessageDelivery> deliveries = deliveryRepository
-                .findAllByDeskAndMessageVisibilityAndMessageStatusNotAndUnlockAtLessThanEqualOrderByCreatedAtDescIdDesc(
+                .findPublicDeliveries(
                         desk,
                         MessageVisibility.PUBLIC,
                         MessageStatus.DELETED,
@@ -324,6 +331,23 @@ public class MessageService {
         if (!elements.isArray() || elements.size() > maxSize) {
             throw new CustomException(ErrorCode.INVALID_CARD_PAYLOAD);
         }
+    }
+
+    /** 오브젝트 metadata에 담긴 유료 요소(아크릴 부적, 보석 스티커)를 서버가 직접 계산해 결제 여부를 검증한다. */
+    private Map<ProductCode, Integer> requiredPurchases(GuestMessageCreateRequest request) {
+        Map<ProductCode, Integer> required = new EnumMap<>(ProductCode.class);
+        JsonNode metadata = request.getObject() == null ? null : request.getObject().getMetadata();
+        if (metadata == null || !metadata.isObject()) {
+            return required;
+        }
+        if ("acrylic".equals(metadata.path("material").asString(""))) {
+            required.put(ProductCode.CHARM_ACRYLIC, 1);
+        }
+        JsonNode gems = metadata.get("gems");
+        if (gems != null && gems.isArray() && !gems.isEmpty()) {
+            required.put(ProductCode.GEM, gems.size());
+        }
+        return required;
     }
 
     private void validateDeskObject(DeskObjectRequest object) {
