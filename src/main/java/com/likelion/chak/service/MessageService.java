@@ -62,6 +62,7 @@ public class MessageService {
         PersonalDesk desk = deskService.findBySupporterTokenForUpdate(supporterToken);
         validateDeskOpen(desk);
         validateRequest(request, true);
+        rejectPhotos(request.getCard());
         paymentService.consume(new CallerIdentity(null, guestIdentity),
                 request.getPaymentOrderId(), requiredPurchases(request));
 
@@ -321,6 +322,23 @@ public class MessageService {
             }
             validateElementArray(page.get("stickerElements"), MAX_STICKERS_PER_PAGE);
             validateElementArray(page.get("photoElements"), MAX_PHOTOS_PER_PAGE);
+        }
+    }
+
+    /** 비회원은 사진을 첨부할 수 없다. 카드 어느 페이지에든 사진 요소가 있으면 거부한다. */
+    private void rejectPhotos(JsonNode card) {
+        if (card == null || !card.isObject()) {
+            return;
+        }
+        JsonNode pages = card.get("pages");
+        if (pages == null || !pages.isArray()) {
+            return;
+        }
+        for (JsonNode page : pages) {
+            JsonNode photos = page.get("photoElements");
+            if (photos != null && photos.isArray() && !photos.isEmpty()) {
+                throw new CustomException(ErrorCode.GUEST_IMAGE_NOT_ALLOWED);
+            }
         }
     }
 

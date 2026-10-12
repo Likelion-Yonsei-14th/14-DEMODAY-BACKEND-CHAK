@@ -24,6 +24,7 @@ public enum ErrorCode {
     INVALID_REPLY(HttpStatus.BAD_REQUEST, "INVALID_REPLY", "답장 대상이나 내용이 올바르지 않습니다."),
     BLOCK_NOT_FOUND(HttpStatus.NOT_FOUND, "BLOCK_NOT_FOUND", "숨긴 작성자를 찾을 수 없습니다."),
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "REPORT_NOT_FOUND", "신고를 찾을 수 없습니다."),
+    GUEST_IMAGE_NOT_ALLOWED(HttpStatus.FORBIDDEN, "GUEST_IMAGE_NOT_ALLOWED", "비회원은 사진을 첨부할 수 없습니다. 로그인해주세요."),
     PAYMENT_REQUIRED(HttpStatus.PAYMENT_REQUIRED, "PAYMENT_REQUIRED", "결제가 필요한 항목이 포함되어 있습니다."),
     INVALID_ORDER(HttpStatus.BAD_REQUEST, "INVALID_ORDER", "주문 항목이 올바르지 않습니다."),
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_NOT_FOUND", "주문을 찾을 수 없습니다."),
