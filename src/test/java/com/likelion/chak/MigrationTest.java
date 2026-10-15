@@ -93,4 +93,46 @@ class MigrationTest {
         new ResourceDatabasePopulator(new ClassPathResource("db/migration/V1__baseline_schema.sql"))
                 .execute(dataSource);
     }
+
+    @Test
+    void chaltteokConstraintsRejectInvalidMoneyStates() throws Exception {
+        String url = "jdbc:h2:mem:chaltteok-constraints;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE";
+        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").load().migrate();
+        {
+            run(url, "INSERT INTO users (kakao_id, display_name, created_at, updated_at) VALUES ('k1','a',NOW(),NOW())");
+            long uid = queryId(url);
+            String wallet = "INSERT INTO chaltteok_wallets (user_id, balance, customer_key, created_at, updated_at) VALUES (%d, %d, '%s', NOW(), NOW())";
+            assertThatThrownBy(() -> run(url, wallet.formatted(uid, -1, "ck-neg"))).isInstanceOf(java.sql.SQLException.class);
+            run(url, wallet.formatted(uid, 10, "ck-ok"));
+            assertThatThrownBy(() -> run(url, wallet.formatted(uid, 0, "ck-dup-user"))).isInstanceOf(java.sql.SQLException.class);
+
+            String charge = "INSERT INTO chaltteok_charges (user_id, order_id, amount, status, payment_key, result_balance, created_at, confirmed_at) VALUES (%d, '%s', %d, '%s', %s, %s, NOW(), %s)";
+            assertThatThrownBy(() -> run(url, charge.formatted(uid, "ord-low", 299, "READY", "NULL", "NULL", "NULL"))).isInstanceOf(java.sql.SQLException.class);
+            assertThatThrownBy(() -> run(url, charge.formatted(uid, "ord-done", 300, "DONE", "NULL", "NULL", "NULL"))).isInstanceOf(java.sql.SQLException.class);
+            run(url, charge.formatted(uid, "ord-1", 300, "DONE", "'pk-1'", "300", "NOW()"));
+            assertThatThrownBy(() -> run(url, charge.formatted(uid, "ord-1", 300, "READY", "NULL", "NULL", "NULL"))).isInstanceOf(java.sql.SQLException.class);
+            assertThatThrownBy(() -> run(url, charge.formatted(uid, "ord-2", 300, "DONE", "'pk-1'", "300", "NOW()"))).isInstanceOf(java.sql.SQLException.class);
+
+            String ledger = "INSERT INTO chaltteok_ledger (user_id, entry_type, amount, balance_after, ref, created_at) VALUES (%d, '%s', %d, %d, '%s', NOW())";
+            assertThatThrownBy(() -> run(url, ledger.formatted(uid, "CHARGE", -5, 0, "r1"))).isInstanceOf(java.sql.SQLException.class);
+            assertThatThrownBy(() -> run(url, ledger.formatted(uid, "PURCHASE", 5, 0, "r2"))).isInstanceOf(java.sql.SQLException.class);
+            assertThatThrownBy(() -> run(url, ledger.formatted(uid, "PURCHASE", -5, -1, "r3"))).isInstanceOf(java.sql.SQLException.class);
+            run(url, ledger.formatted(uid, "CHARGE", 300, 300, "ord-1"));
+            assertThatThrownBy(() -> run(url, ledger.formatted(uid, "CHARGE", 300, 600, "ord-1"))).isInstanceOf(java.sql.SQLException.class);
+        }
+    }
+
+    private static void run(String url, String sql) throws java.sql.SQLException {
+        try (var c = DriverManager.getConnection(url, "sa", ""); var st = c.createStatement()) {
+            st.execute(sql);
+        }
+    }
+
+    private static long queryId(String url) throws java.sql.SQLException {
+        try (var c = DriverManager.getConnection(url, "sa", ""); var st = c.createStatement();
+             var rs = st.executeQuery("SELECT id FROM users WHERE kakao_id='k1'")) {
+            rs.next();
+            return rs.getLong(1);
+        }
+    }
 }

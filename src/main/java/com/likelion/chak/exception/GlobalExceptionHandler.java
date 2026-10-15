@@ -1,7 +1,11 @@
 package com.likelion.chak.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -15,6 +19,15 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(InsufficientChaltteokException.class)
+    public ResponseEntity<ChaltteokErrorResponse> handleInsufficient(InsufficientChaltteokException e) {
+        ErrorCode errorCode = e.getErrorCode();
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(new ChaltteokErrorResponse(
+                        errorCode.getCode(), errorCode.getMessage(), e.getRequired(), e.getBalance()));
+    }
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustomException(CustomException e) {
@@ -37,6 +50,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ErrorResponse.from(errorCode));
+    }
+
+    /** 낙관적 락 충돌, 락 대기 시간 초과, 데드락 패배: 아무것도 반영되지 않았으니 다시 시도하면 된다. */
+    @ExceptionHandler({
+            ObjectOptimisticLockingFailureException.class,
+            PessimisticLockingFailureException.class
+    })
+    public ResponseEntity<ErrorResponse> handleConcurrency(Exception e) {
+        log.warn("Concurrent update conflict: {}", e.toString());
+        return respond(ErrorCode.CONCURRENT_REQUEST);
+    }
+
+    /** 유니크·CHECK 제약 위반은 코드 버그나 중복 요청이므로 내용은 로그에만 남기고 일반 오류로 응답한다. */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleIntegrity(DataIntegrityViolationException e) {
+        log.error("Data integrity violation", e);
+        return respond(ErrorCode.CONCURRENT_REQUEST);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException e) {
+        return respond(ErrorCode.INVALID_REQUEST);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
