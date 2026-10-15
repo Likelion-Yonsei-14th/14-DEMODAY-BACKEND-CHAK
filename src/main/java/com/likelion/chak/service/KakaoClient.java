@@ -103,7 +103,12 @@ public class KakaoClient implements OAuthClient {
                 response.get("id").asString(),
                 nickname,
                 text(account, "email"),
-                text(profile, "profile_image_url"));
+                toHttps(text(profile, "profile_image_url")));
+    }
+
+    /** 카카오가 http 주소를 내려주는 경우가 있어, https 사이트에서 막히지 않도록 https로 바꿔 저장한다. */
+    static String toHttps(String url) {
+        return url != null && url.startsWith("http://") ? "https://" + url.substring("http://".length()) : url;
     }
 
     private void validateConfiguration() {
