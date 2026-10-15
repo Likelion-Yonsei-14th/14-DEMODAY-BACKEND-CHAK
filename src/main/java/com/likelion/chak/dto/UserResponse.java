@@ -1,5 +1,6 @@
 package com.likelion.chak.dto;
 
+import com.likelion.chak.domain.AuthProvider;
 import com.likelion.chak.domain.UserAccount;
 
 public record UserResponse(
@@ -7,7 +8,8 @@ public record UserResponse(
         String displayName,
         String email,
         String profileImageUrl,
-        boolean admin) {
+        boolean admin,
+        AuthProvider provider) {
 
     public static UserResponse from(UserAccount user) {
         return new UserResponse(
@@ -15,6 +17,7 @@ public record UserResponse(
                 user.getDisplayName(),
                 user.getEmail(),
                 user.getProfileImageUrl(),
-                user.isAdmin());
+                user.isAdmin(),
+                user.getProvider());
     }
 }

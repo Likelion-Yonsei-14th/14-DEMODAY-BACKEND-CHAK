@@ -9,6 +9,8 @@ public enum ErrorCode {
     ADMIN_REQUIRED(HttpStatus.FORBIDDEN, "ADMIN_REQUIRED", "운영자 권한이 필요합니다."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다."),
     INVALID_KAKAO_AUTH_CODE(HttpStatus.UNAUTHORIZED, "INVALID_KAKAO_AUTH_CODE", "카카오 인가 코드가 유효하지 않습니다."),
+    INVALID_GOOGLE_AUTH_CODE(HttpStatus.UNAUTHORIZED, "INVALID_GOOGLE_AUTH_CODE", "구글 인가 코드가 유효하지 않습니다."),
+    GOOGLE_API_ERROR(HttpStatus.BAD_GATEWAY, "GOOGLE_API_ERROR", "구글 API 통신 또는 설정 오류입니다."),
     KAKAO_API_ERROR(HttpStatus.BAD_GATEWAY, "KAKAO_API_ERROR", "카카오 로그인 서버와 통신하지 못했습니다."),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "리프레시 토큰이 유효하지 않습니다."),
     EXPIRED_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "EXPIRED_REFRESH_TOKEN", "리프레시 토큰이 만료되었습니다."),

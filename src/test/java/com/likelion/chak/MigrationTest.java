@@ -99,7 +99,7 @@ class MigrationTest {
         String url = "jdbc:h2:mem:chaltteok-constraints;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE";
         Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").load().migrate();
         {
-            run(url, "INSERT INTO users (kakao_id, display_name, created_at, updated_at) VALUES ('k1','a',NOW(),NOW())");
+            run(url, "INSERT INTO users (provider_user_id, display_name, created_at, updated_at) VALUES ('k1','a',NOW(),NOW())");
             long uid = queryId(url);
             String wallet = "INSERT INTO chaltteok_wallets (user_id, balance, customer_key, created_at, updated_at) VALUES (%d, %d, '%s', NOW(), NOW())";
             assertThatThrownBy(() -> run(url, wallet.formatted(uid, -1, "ck-neg"))).isInstanceOf(java.sql.SQLException.class);
@@ -122,6 +122,27 @@ class MigrationTest {
         }
     }
 
+    @Test
+    void socialLoginMigrationKeepsKakaoMembersAndScopesUniquenessPerProvider() throws Exception {
+        String url = "jdbc:h2:mem:social-login;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE";
+        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration")
+                .target("7").load().migrate();
+        run(url, "INSERT INTO users (kakao_id, display_name, created_at, updated_at) VALUES ('12345','기존','2026-01-01 00:00:00','2026-01-01 00:00:00')");
+
+        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").load().migrate();
+
+        try (var c = DriverManager.getConnection(url, "sa", ""); var st = c.createStatement();
+             var rs = st.executeQuery("SELECT provider, provider_user_id FROM users")) {
+            assertThat(rs.next()).isTrue();
+            assertThat(rs.getString(1)).isEqualTo("KAKAO");
+            assertThat(rs.getString(2)).isEqualTo("12345");
+        }
+        String insert = "INSERT INTO users (provider, provider_user_id, display_name, created_at, updated_at) VALUES ('%s','%s','n',NOW(),NOW())";
+        run(url, insert.formatted("GOOGLE", "12345"));
+        assertThatThrownBy(() -> run(url, insert.formatted("GOOGLE", "12345"))).isInstanceOf(java.sql.SQLException.class);
+        assertThatThrownBy(() -> run(url, insert.formatted("KAKAO", "12345"))).isInstanceOf(java.sql.SQLException.class);
+    }
+
     private static void run(String url, String sql) throws java.sql.SQLException {
         try (var c = DriverManager.getConnection(url, "sa", ""); var st = c.createStatement()) {
             st.execute(sql);
@@ -130,7 +151,7 @@ class MigrationTest {
 
     private static long queryId(String url) throws java.sql.SQLException {
         try (var c = DriverManager.getConnection(url, "sa", ""); var st = c.createStatement();
-             var rs = st.executeQuery("SELECT id FROM users WHERE kakao_id='k1'")) {
+             var rs = st.executeQuery("SELECT id FROM users WHERE provider_user_id='k1'")) {
             rs.next();
             return rs.getLong(1);
         }

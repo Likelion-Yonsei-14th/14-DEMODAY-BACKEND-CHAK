@@ -2,6 +2,8 @@ package com.likelion.chak.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -24,8 +26,13 @@ public class UserAccount {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, updatable = false, length = 100)
-    private String kakaoId;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, updatable = false, length = 20)
+    private AuthProvider provider;
+
+    /** 제공자가 발급한 불변 식별자(카카오 회원번호, 구글 sub). (provider, providerUserId)가 유일하다. */
+    @Column(nullable = false, updatable = false, length = 100)
+    private String providerUserId;
 
     @Column(nullable = false, length = 50)
     private String displayName;
@@ -45,11 +52,22 @@ public class UserAccount {
     @Column(nullable = false)
     private Instant updatedAt;
 
-    private UserAccount(String kakaoId, String displayName, String email, String profileImageUrl) {
-        this.kakaoId = kakaoId;
+    private UserAccount(
+            AuthProvider provider, String providerUserId, String displayName, String email, String profileImageUrl) {
+        this.provider = provider;
+        this.providerUserId = providerUserId;
         this.displayName = displayName;
         this.email = email;
         this.profileImageUrl = profileImageUrl;
+    }
+
+    public static UserAccount create(
+            AuthProvider provider,
+            String providerUserId,
+            String displayName,
+            String email,
+            String profileImageUrl) {
+        return new UserAccount(provider, providerUserId, displayName, email, profileImageUrl);
     }
 
     public static UserAccount createKakao(
@@ -57,10 +75,18 @@ public class UserAccount {
             String displayName,
             String email,
             String profileImageUrl) {
-        return new UserAccount(kakaoId, displayName, email, profileImageUrl);
+        return create(AuthProvider.KAKAO, kakaoId, displayName, email, profileImageUrl);
     }
 
-    public void updateKakaoProfile(String displayName, String email, String profileImageUrl) {
+    public static UserAccount createGoogle(
+            String googleId,
+            String displayName,
+            String email,
+            String profileImageUrl) {
+        return create(AuthProvider.GOOGLE, googleId, displayName, email, profileImageUrl);
+    }
+
+    public void updateProfile(String displayName, String email, String profileImageUrl) {
         this.displayName = displayName;
         this.email = email;
         this.profileImageUrl = profileImageUrl;
