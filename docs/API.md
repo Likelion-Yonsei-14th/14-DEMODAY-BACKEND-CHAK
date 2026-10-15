@@ -872,6 +872,38 @@ GET  /api/public/unlocks                  [ { "category": "STATIONERY", "assetId
 - 노출 중인 해제용 광고가 **없으면** 사용자를 막지 않기 위해 광고 없이 해제됩니다.
 - 이미 해제한 항목을 다시 요청해도 성공(멱등)입니다.
 
+### 10.3 찰떡(충전식 포인트)
+
+회원 전용(`Authorization: Bearer`)입니다. 1원 = 1찰떡이며 상품 단가는 10.1과 같습니다. 비로그인 요청은 `401 UNAUTHORIZED`입니다.
+
+```text
+GET  /api/chaltteok/balance          { "balance": 1200, "customerKey": "…" }
+POST /api/chaltteok/charges          { "amount": 1000 }  →  201 { "orderId", "amount", "orderName" }
+POST /api/chaltteok/charges/confirm  { "paymentKey", "orderId", "amount" }  →  { "orderId", "chargedAmount", "balance" }
+POST /api/chaltteok/purchases        { "items": [ { "code": "GEM", "ref": null, "quantity": 4 } ] }
+                                     →  { "spent": 20, "balance": 1180, "orderId": 31 }
+GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "balanceAfter", "ref", "createdAt" } ]
+```
+
+**충전 흐름**: `charges`로 주문번호를 받고 → 토스 결제위젯(`customerKey`·`orderId`·`amount`)으로 결제 → 성공 리다이렉트의 `paymentKey`로 `charges/confirm`을 호출하면 서버가 토스 승인 API를 호출해 금액을 검증한 뒤 잔액에 반영합니다.
+
+- 충전 금액은 300원 이상 50,000원 이하 정수입니다(`400 INVALID_CHARGE_AMOUNT`). `orderId`는 서버가 발급하며 토스 규격(6~64자)을 만족합니다. 결제가 끝나지 않은 주문은 사용자당 최근 1시간에 10개까지입니다(`429 TOO_MANY_PENDING_CHARGES`).
+- `confirm`의 `amount`가 주문 금액과 다르면 `400 AMOUNT_MISMATCH`, 본인 주문이 아니거나 없으면 `404 ORDER_NOT_FOUND`, 발급 후 1시간 안에 한 번도 승인을 시도하지 않은 주문은 `409 ORDER_EXPIRED`입니다. `orderId`는 `[A-Za-z0-9_=-]{6,64}`가 아니면 `400 INVALID_REQUEST`입니다.
+- **멱등**: 이미 승인한 주문을 다시 `confirm`하면 토스를 다시 호출하지 않고 처음 결과를 그대로 돌려줍니다(새로고침·재시도 안전).
+- **동시 요청**: 같은 주문을 동시에 `confirm`하면 하나만 승인을 처리하고 나머지는 `409 CHARGE_IN_PROGRESS`입니다. 잠시 후 같은 요청을 다시 보내면 처음 결과가 옵니다.
+- **재시도 규칙**: `502 PAYMENT_CONFIRM_FAILED`(토스 통신 오류·토스 일시 오류)와 `409 CHARGE_IN_PROGRESS`는 **같은 주문으로 다시 `confirm`**하면 됩니다. 토스가 이미 승인했는데 서버 반영이 실패했던 경우에도 재시도하면 결제를 조회해 검증한 뒤 반영합니다. `400 PAYMENT_DECLINED`(카드 거절 등)는 결제를 다시 해야 합니다.
+- **구매**: 서버가 단가로 합계를 계산해 잔액에서 차감하고, 결제 완료된 주문을 만들어 `orderId`를 돌려줍니다. 편지 전송 시 이 값을 `paymentOrderId`로 보내면 한 번 소비됩니다(전송 실패 시 같은 `orderId`로 재시도 가능).
+- **구매 멱등(권장)**: `Idempotency-Key: <8~64자 [A-Za-z0-9_-]>` 헤더를 붙이면 같은 키의 재요청(더블클릭·네트워크 재시도)은 다시 차감하지 않고 처음 결과를 돌려줍니다. 같은 키에 다른 항목이면 `409 IDEMPOTENCY_KEY_REUSED`입니다. 사용자가 결제 버튼을 누를 때마다 새 키(UUID)를 만들고, 그 시도를 재시도할 때만 같은 키를 쓰세요.
+- 한 항목 수량은 1~100, 한 번에 20종까지입니다(`400 INVALID_PURCHASE`/`INVALID_REQUEST`).
+- 요청이 겹쳐 DB 충돌이 나면 `409 CONCURRENT_REQUEST`이며 아무것도 반영되지 않았으니 다시 시도하면 됩니다.
+- 잔액이 부족하면 `402 INSUFFICIENT_CHALTTEOK`이고 본문에 `required`(필요한 찰떡)와 `balance`(현재 잔액)가 **최상위 필드**로 함께 옵니다.
+
+```json
+{ "code": "INSUFFICIENT_CHALTTEOK", "message": "찰떡이 부족합니다.", "required": 400, "balance": 300 }
+```
+
+> **승인 수단**: `CHALTTEOK_PROVIDER` = `mock`(로컬 기본, 항상 승인·돈 안 오감) / `toss`(토스페이먼츠 `POST /v1/payments/confirm`, `TOSS_SECRET_KEY` 필요) / `none`(`prod` 기본, 충전 `503 PAYMENT_NOT_CONFIGURED`). 시크릿 키는 서버에만 두며 프론트에는 클라이언트 키(`VITE_TOSS_CLIENT_KEY`)만 둡니다. 환불·결제 취소·찰떡 회수는 아직 없습니다.
+
 ## 11. 전체 에러 코드
 
 | HTTP | 코드 | 설명 |
@@ -912,6 +944,17 @@ GET  /api/public/unlocks                  [ { "category": "STATIONERY", "assetId
 | 404 | `ORDER_NOT_FOUND` | 본인의 주문이 아님 |
 | 409 | `ORDER_ALREADY_USED` | 이미 사용한 결제 |
 | 503 | `PAYMENT_NOT_CONFIGURED` | 결제 승인 수단 미설정 |
+| 400 | `INVALID_CHARGE_AMOUNT` | 찰떡 충전 금액이 300~50,000원 정수가 아님 |
+| 400 | `AMOUNT_MISMATCH` | 승인 요청 금액이 충전 주문과 다름 |
+| 400 | `INVALID_PURCHASE` | 찰떡 구매 항목 오류 |
+| 402 | `INSUFFICIENT_CHALTTEOK` | 찰떡 부족(본문에 `required`, `balance` 포함) |
+| 400 | `PAYMENT_DECLINED` | 토스가 결제를 승인하지 않음 |
+| 502 | `PAYMENT_CONFIRM_FAILED` | 토스 승인 서버 통신·일시 오류(같은 주문으로 재시도) |
+| 409 | `ORDER_EXPIRED` | 승인을 시도하지 않고 1시간이 지난 충전 주문 |
+| 409 | `CHARGE_IN_PROGRESS` | 같은 충전 주문을 다른 요청이 처리 중(잠시 후 재시도) |
+| 429 | `TOO_MANY_PENDING_CHARGES` | 결제 안 끝난 충전 주문이 10개를 넘음 |
+| 409 | `IDEMPOTENCY_KEY_REUSED` | 같은 `Idempotency-Key`를 다른 내용으로 사용 |
+| 409 | `CONCURRENT_REQUEST` | 요청 겹침으로 DB 충돌(반영 없음, 재시도) |
 | 403 | `AD_NOT_COMPLETED` | 광고 시청 완료 기록이 없음 |
 | 409 | `MESSAGE_LOCKED` | 공개 시각 전 읽기 요청 |
 | 409 | `MEDIA_UPLOAD_NOT_FOUND` | S3에서 업로드 결과를 찾지 못함 |

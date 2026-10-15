@@ -24,6 +24,7 @@
 - 광고 기간·위치 관리와 노출·시청·클릭 기록, 광고 시청으로 편지지·소품 해제
 - 반응·답장·신고·작성자 숨기기, 보낸 응원 목록과 삭제
 - 상품 가격표 기반 주문·승인(개발용 mock)과 유료 요소(아크릴 부적·보석) 결제 검증
+- 찰떡(충전식 포인트): 토스페이먼츠 충전 승인, 잔액·내역, 구매 시 결제 완료 주문 발급
 - 책상 설정 변경 시 아직 열리지 않은 편지의 공개 시각 재계산
 - 회원·비회원 트래픽 이벤트 및 운영자 집계
 
@@ -66,6 +67,7 @@ export JWT_SECRET='at-least-32-byte-production-secret'
 export S3_BUCKET='chak-media'
 export AWS_REGION='ap-northeast-2'
 # 개발: PAYMENT_PROVIDER 기본값은 mock(실제로 돈이 오가지 않는 가짜 결제)
+# 찰떡 충전: CHALTTEOK_PROVIDER=mock(기본)|toss|none, 토스는 TOSS_SECRET_KEY 필요
 # 운영: 아래 프로필을 켜면 기본 JWT 시크릿으로는 기동 실패, 쿠키 Secure 기본 true, Swagger 기본 비활성,
 #       결제 기본값 none(승인 거부). 실제 PG 연동 전에는 결제를 열지 마세요.
 # export SPRING_PROFILES_ACTIVE=prod

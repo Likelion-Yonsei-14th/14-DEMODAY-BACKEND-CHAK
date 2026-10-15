@@ -13,6 +13,7 @@
 | V4 | `personal_desks.push_enabled` |
 | V5 | message_reactions, message_replies, message_reply_targets, message_reports, desk_blocks, 작성자 조회 인덱스 |
 | V6 | payment_orders, payment_order_items, ad_unlocks |
+| V7 | chaltteok_wallets, chaltteok_charges, chaltteok_ledger |
 
 ## 관계도
 
@@ -245,3 +246,29 @@ UNIQUE `(advertisement_id, event_type, session_id)` — 재시도 중복 방지.
 | asset_id | VARCHAR(100) | 프론트 에셋 식별자 |
 | ad_session_id | VARCHAR(100) | 해제에 쓴 광고 노출 식별자 |
 | created_at | DATETIME(6) | |
+
+## 찰떡 포인트 (V7)
+
+충전식 포인트(1원 = 1찰떡)이며 회원 계정 단위입니다. 비회원은 쓸 수 없습니다. 돈과 직결되므로 **불변 조건을 애플리케이션뿐 아니라 DB 제약으로도 강제**합니다.
+
+| 테이블 | 컬럼 | 제약·역할 |
+| --- | --- | --- |
+| chaltteok_wallets | id, user_id, balance, customer_key, version, created_at, updated_at | `user_id` UNIQUE(회원당 지갑 1개), `customer_key` UNIQUE(무작위 UUID, 토스 구매자 식별자), **CHECK balance ≥ 0**. `version`은 잠금 없이 쓰는 실수를 잡는 낙관적 락 안전망 |
+| chaltteok_charges | id, user_id, order_id, amount, status(`READY` `CONFIRMING` `DONE`), payment_key, result_balance, claimed_at, created_at, confirmed_at | `order_id` UNIQUE, **`payment_key` UNIQUE**(한 결제를 두 주문에 못 씀), CHECK amount 300~50,000, **CHECK DONE이면 payment_key·result_balance·confirmed_at 필수** |
+| chaltteok_ledger | id, user_id, entry_type(`CHARGE` `PURCHASE`), amount(충전 +, 구매 −), balance_after, ref, idempotency_key, request_hash, created_at | append-only. **UNIQUE (entry_type, ref)**: 충전 주문·구매 주문은 장부에 한 번만. **UNIQUE (user_id, idempotency_key)**: 같은 키로 이중 차감 불가. CHECK 부호(충전>0, 구매<0), CHECK balance_after ≥ 0 |
+
+- 장부 합계(`SUM(amount)`)는 항상 지갑 `balance`와 같아야 합니다(`ChaltteokService.isConsistent`, 테스트가 검증).
+- `status` 값 목록 CHECK는 넣지 않았습니다(테스트용 H2 2.4의 `IN` 제약 버그). 값은 enum과 선점 쿼리로만 바뀝니다.
+- 구매하면 `payment_orders`에 `provider='CHALTTEOK'`, `status='PAID'` 주문이 만들어지고, 편지 전송 때 `paymentOrderId`로 한 번 소비됩니다.
+
+### 동시성 설계
+| 상황 | 방어 |
+| --- | --- |
+| 동시 구매로 잔액 초과 차감 | 지갑 행 `SELECT … FOR UPDATE` 후 잔액 확인·차감. 잔액 100에서 30원 구매를 동시에 20번 요청하면 정확히 3건만 성공(테스트) |
+| 같은 충전 주문을 동시에 승인 | `UPDATE … WHERE status='READY'` 선점(CAS)으로 한 요청만 토스를 호출, 나머지는 `409 CHARGE_IN_PROGRESS`. 선점은 2분 뒤 만료 |
+| 토스 호출이 느림 | 토스 호출은 **트랜잭션 밖**(DB 잠금·커넥션을 쥐지 않음), 연결 3초·읽기 15초 타임아웃 |
+| 토스 승인 후 DB 반영 실패 | 재시도 시 토스가 `ALREADY_PROCESSED_PAYMENT`를 돌려주면 결제를 조회해 DONE·주문번호·금액이 일치할 때만 인정 후 반영 |
+| 구매 더블클릭·재시도 | `Idempotency-Key`로 처음 결과 재응답. 같은 키에 다른 내용이면 `409` |
+| 지갑 최초 생성 경합 | `INSERT IGNORE`(유니크 제약 위에서 예외 없이 1건으로 합쳐짐) |
+| 결제 안 끝난 주문 폭주 | 사용자당 최근 1시간 `READY` 주문 10개 상한. 지갑 행 잠금으로 직렬화해 우회 불가 |
+| 데드락 | 잠금 순서를 충전 주문 → 지갑으로 고정(구매는 지갑만) |
