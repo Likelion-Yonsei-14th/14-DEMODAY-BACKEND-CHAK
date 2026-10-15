@@ -77,6 +77,7 @@ Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 
 상세 요청·응답 및 프론트 연동 규칙: [`docs/API.md`](docs/API.md)
 DB 구조: [`docs/DATABASE.md`](docs/DATABASE.md)
+배포(AWS, 자동 업데이트): [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
 
 프론트와 API가 서로 다른 도메인이면 `CORS_ALLOWED_ORIGINS`에 프론트 Origin을 추가하고, 비회원 쿠키와 리프레시 쿠키를 위해 `GUEST_COOKIE_SAME_SITE=None`, `REFRESH_COOKIE_SAME_SITE=None`, `GUEST_COOKIE_SECURE=true`, `REFRESH_COOKIE_SECURE=true`(HTTPS)를 설정합니다. 같은 사이트(서브도메인 포함)면 기본값 `Lax`를 유지합니다.
 
