@@ -14,6 +14,7 @@
 | V5 | message_reactions, message_replies, message_reply_targets, message_reports, desk_blocks, 작성자 조회 인덱스 |
 | V6 | payment_orders, payment_order_items, ad_unlocks |
 | V7 | chaltteok_wallets, chaltteok_charges, chaltteok_ledger |
+| V8 | users: `kakao_id` → `provider` + `provider_user_id`, 유일 제약을 (provider, provider_user_id)로 변경 (기존 회원은 모두 KAKAO) |
 
 ## 관계도
 
@@ -35,11 +36,12 @@ traffic_events (user 또는 guest, FK 없는 resource_key)
 | 컬럼 | 타입 | 비고 |
 | --- | --- | --- |
 | id | BIGINT PK | |
-| kakao_id | VARCHAR(100) | UNIQUE, 카카오 회원번호 |
-| display_name | VARCHAR(50) | 카카오 닉네임, 로그인마다 갱신 |
+| provider | VARCHAR(20) | 로그인 제공자 `KAKAO` `GOOGLE`, 기본 `KAKAO` |
+| provider_user_id | VARCHAR(100) | 제공자 식별자(카카오 회원번호, 구글 `sub`). UNIQUE `(provider, provider_user_id)` |
+| display_name | VARCHAR(50) | 제공자 닉네임, 로그인마다 갱신 |
 | email | VARCHAR(320) | NULL 가능 |
 | profile_image_url | VARCHAR(1000) | NULL 가능 |
-| admin | BOOLEAN | 기본 FALSE, `ADMIN_KAKAO_IDS` 로그인 시 갱신 |
+| admin | BOOLEAN | 기본 FALSE, `ADMIN_KAKAO_IDS`·`ADMIN_GOOGLE_IDS` 로그인 시 갱신 |
 | created_at, updated_at | DATETIME(6) | |
 
 ### guest_identities

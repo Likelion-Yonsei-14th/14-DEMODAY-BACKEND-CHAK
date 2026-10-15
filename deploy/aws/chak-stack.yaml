@@ -40,9 +40,9 @@ Resources:
     Type: AWS::SecretsManager::Secret
     Properties:
       Name: chak/prod/app
-      Description: CHAK backend secrets. JWT_SECRET is generated; fill in the Kakao values after deploy.
+      Description: CHAK backend secrets. JWT_SECRET is generated; fill in the Kakao and Google values after deploy.
       GenerateSecretString:
-        SecretStringTemplate: '{"KAKAO_CLIENT_ID":"","KAKAO_CLIENT_SECRET":"","ADMIN_KAKAO_IDS":""}'
+        SecretStringTemplate: '{"KAKAO_CLIENT_ID":"","KAKAO_CLIENT_SECRET":"","ADMIN_KAKAO_IDS":"","GOOGLE_CLIENT_ID":"","GOOGLE_CLIENT_SECRET":"","ADMIN_GOOGLE_IDS":""}'
         GenerateStringKey: JWT_SECRET
         PasswordLength: 64
         ExcludePunctuation: true
@@ -212,6 +212,9 @@ Resources:
             echo "KAKAO_CLIENT_ID=$(jq -r .KAKAO_CLIENT_ID <<<"$APP")"
             echo "KAKAO_CLIENT_SECRET=$(jq -r .KAKAO_CLIENT_SECRET <<<"$APP")"
             echo "ADMIN_KAKAO_IDS=$(jq -r .ADMIN_KAKAO_IDS <<<"$APP")"
+            echo "GOOGLE_CLIENT_ID=$(jq -r '.GOOGLE_CLIENT_ID // ""' <<<"$APP")"
+            echo "GOOGLE_CLIENT_SECRET=$(jq -r '.GOOGLE_CLIENT_SECRET // ""' <<<"$APP")"
+            echo "ADMIN_GOOGLE_IDS=$(jq -r '.ADMIN_GOOGLE_IDS // ""' <<<"$APP")"
             echo "S3_BUCKET=${MediaBucket}"
             echo "AWS_REGION=$REGION"
             echo "CORS_ALLOWED_ORIGINS=${FrontendOrigins}"

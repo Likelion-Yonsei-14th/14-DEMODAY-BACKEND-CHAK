@@ -1,5 +1,6 @@
 package com.likelion.chak.service;
 
+import com.likelion.chak.domain.AuthProvider;
 import com.likelion.chak.exception.CustomException;
 import com.likelion.chak.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,7 +14,7 @@ import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 
 @Component
-public class KakaoClient {
+public class KakaoClient implements OAuthClient {
 
     private final RestClient restClient;
     private final String clientId;
@@ -33,7 +34,13 @@ public class KakaoClient {
         this.userInfoUri = userInfoUri;
     }
 
-    public KakaoProfile authenticate(String code, String redirectUri) {
+    @Override
+    public AuthProvider provider() {
+        return AuthProvider.KAKAO;
+    }
+
+    @Override
+    public OAuthProfile authenticate(String code, String redirectUri) {
         validateConfiguration();
 
         try {
@@ -73,7 +80,7 @@ public class KakaoClient {
         return accessToken;
     }
 
-    private KakaoProfile requestProfile(String accessToken) {
+    private OAuthProfile requestProfile(String accessToken) {
         JsonNode response = restClient.get()
                 .uri(userInfoUri)
                 .headers(headers -> headers.setBearerAuth(accessToken))
@@ -91,7 +98,8 @@ public class KakaoClient {
             nickname = "카카오 사용자";
         }
 
-        return new KakaoProfile(
+        return new OAuthProfile(
+                AuthProvider.KAKAO,
                 response.get("id").asString(),
                 nickname,
                 text(account, "email"),
