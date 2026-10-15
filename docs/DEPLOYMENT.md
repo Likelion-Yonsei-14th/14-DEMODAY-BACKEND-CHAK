@@ -39,7 +39,10 @@ aws cloudformation create-stack --stack-name chak-prod \
 | --- | --- |
 | `KAKAO_CLIENT_ID` | 카카오 REST API 키 |
 | `KAKAO_CLIENT_SECRET` | 카카오 클라이언트 시크릿(사용 시) |
+| `GOOGLE_CLIENT_ID` | 구글 OAuth 클라이언트 ID(웹 애플리케이션) |
+| `GOOGLE_CLIENT_SECRET` | 구글 OAuth 클라이언트 보안 비밀 |
 | `ADMIN_KAKAO_IDS` | 운영자 카카오 회원번호(쉼표 구분) |
+| `ADMIN_GOOGLE_IDS` | 운영자 구글 `sub`(쉼표 구분, 선택) |
 
 값을 바꾼 뒤 서버에서 `sudo /opt/chak/run.sh` 를 실행하거나(SSM Session Manager), 다음 이미지 배포 때 반영된다.
 
@@ -50,7 +53,7 @@ aws cloudformation create-stack --stack-name chak-prod \
 첫 배포 후 GitHub → 조직의 Packages → `14-demoday-backend-chak` → Package settings → **Change visibility → Public**. 서버가 인증 없이 이미지를 받는다(코드는 공개 저장소라 이미지에 비밀이 없다. 비밀은 실행 시 Secrets Manager에서 읽는다).
 
 ### 4. 프론트 연결
-프론트(Vercel)는 `/api/*` 요청을 CloudFront 주소로 넘기는 rewrite를 쓴다. 브라우저에서는 같은 사이트라 쿠키(`SameSite=Lax`)와 CORS 문제가 없다. 카카오 개발자 콘솔의 Redirect URI에 `https://<프론트 도메인>/auth/kakao/callback`을 등록한다.
+프론트(Vercel)는 `/api/*` 요청을 CloudFront 주소로 넘기는 rewrite를 쓴다. 브라우저에서는 같은 사이트라 쿠키(`SameSite=Lax`)와 CORS 문제가 없다. 카카오 개발자 콘솔의 Redirect URI에 `https://<프론트 도메인>/auth/kakao/callback`, 구글 클라우드 콘솔의 승인된 리디렉션 URI에 `https://<프론트 도메인>/auth/google/callback`을 등록한다.
 
 ## 매일 쓰는 흐름
 `main`에 머지 → GitHub Actions(`.github/workflows/docker-publish.yml`)가 테스트·빌드·push(약 4~6분) → 서버가 1분 안에 감지해 교체. 문서(`*.md`, `docs/`)만 바뀐 커밋은 배포하지 않는다.

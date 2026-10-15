@@ -24,7 +24,7 @@
 
 | 경로 | 인증 |
 | --- | --- |
-| `POST /api/auth/kakao`, `POST /api/auth/refresh` | 불필요 |
+| `POST /api/auth/kakao`, `POST /api/auth/google`, `POST /api/auth/refresh` | 불필요 |
 | `/api/public/**` | 선택 (Bearer가 있으면 회원, 없으면 `chak_guest_id` 쿠키의 비회원으로 처리) |
 | `POST /api/auth/logout`, `/api/users/**`, `/api/desks/me/**`, `/api/media/**` | 필수 |
 | `/api/admin/**` | 필수 + 운영자 |
@@ -78,12 +78,12 @@
 
 테이블·컬럼·제약은 [`DATABASE.md`](DATABASE.md)를 참고하세요.
 
-## 2. 카카오 로그인 흐름
+## 2. 소셜 로그인 흐름(카카오·구글)
 
-1. 프론트가 사용자를 카카오 인가 URL로 이동시킵니다.
-2. 카카오가 등록된 `redirect_uri`로 `code`를 전달합니다.
-3. 프론트가 `code`와 인가 요청 때 사용한 동일한 `redirectUri`를 `POST /api/auth/kakao`로 보냅니다.
-4. 백엔드가 카카오 토큰 및 사용자 정보를 조회하고 CHAK 토큰을 반환합니다.
+1. 프론트가 사용자를 카카오 또는 구글 인가 URL로 이동시킵니다.
+2. 제공자가 등록된 `redirect_uri`로 `code`를 전달합니다.
+3. 프론트가 `code`와 인가 요청 때 사용한 동일한 `redirectUri`를 `POST /api/auth/kakao` 또는 `POST /api/auth/google`로 보냅니다.
+4. 백엔드가 제공자의 토큰 및 사용자 정보를 조회하고 CHAK 토큰을 반환합니다.
 5. 프론트는 보호 API 호출 시 액세스 토큰을 Bearer 헤더에 넣습니다.
 6. 액세스 토큰 만료 시 `POST /api/auth/refresh`로 토큰 쌍을 교체합니다.
 
@@ -97,7 +97,18 @@ https://kauth.kakao.com/oauth/authorize
   &state={RANDOM_CSRF_VALUE}
 ```
 
-`redirect_uri`는 카카오 디벨로퍼스에 미리 등록해야 하며, 인가 URL과 로그인 API 요청에서 완전히 같아야 합니다. 프론트는 임의의 `state`를 생성하고 콜백에서 같은 값인지 검증해야 합니다.
+구글 인가 URL 형식:
+
+```text
+https://accounts.google.com/o/oauth2/v2/auth
+  ?client_id={GOOGLE_CLIENT_ID}
+  &redirect_uri={URL_ENCODED_REDIRECT_URI}
+  &response_type=code
+  &scope=openid%20email%20profile
+  &state={RANDOM_CSRF_VALUE}
+```
+
+`redirect_uri`는 카카오 디벨로퍼스·구글 클라우드 콘솔에 미리 등록해야 하며, 인가 URL과 로그인 API 요청에서 완전히 같아야 합니다. 프론트는 임의의 `state`를 생성하고 콜백에서 같은 값인지 검증해야 합니다.
 
 ## 3. 인증 API
 
@@ -143,6 +154,15 @@ https://kauth.kakao.com/oauth/authorize
 | 400 | `INVALID_REQUEST` | `code` 또는 `redirectUri` 누락 |
 | 401 | `INVALID_KAKAO_AUTH_CODE` | 만료되었거나 잘못된 인가 코드 |
 | 502 | `KAKAO_API_ERROR` | 카카오 API 통신 또는 서버 설정 오류 |
+
+### 3.1.1 구글 로그인
+
+`POST /api/auth/google` — 요청·응답은 3.1과 같습니다(`code`, `redirectUri`). 응답의 `user`에는 어떤 로그인으로 만든 계정인지 `provider`(`KAKAO` | `GOOGLE`)가 함께 옵니다.
+
+- 계정은 **(제공자, 제공자 식별자)** 로만 찾습니다(카카오는 회원번호, 구글은 변하지 않는 `sub`). 같은 사람이 카카오와 구글로 각각 로그인하면 **서로 다른 계정**이며, 이메일이 같아도 자동으로 합치지 않습니다(검증되지 않은 이메일로 남의 계정을 가로채는 것을 막기 위해). 계정 연결은 별도 기능으로 둡니다.
+- 구글이 검증한 이메일(`email_verified`)만 저장하며, 아니면 `null`입니다. 이름은 최대 50자로 잘라 저장합니다.
+- 코드는 1회용이라 만료·재사용되면 `401 INVALID_GOOGLE_AUTH_CODE`, 서버의 구글 클라이언트 설정 오류나 구글 장애는 `502 GOOGLE_API_ERROR`(서버 로그에 원인 기록)입니다.
+- 서버에 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`이 없으면 `502 GOOGLE_API_ERROR`입니다.
 
 ### 3.2 토큰 재발급
 
@@ -678,7 +698,7 @@ S3 버킷은 프론트 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허
 
 ## 8. 운영자 API
 
-Bearer 인증이 필요하며 카카오 회원번호가 `ADMIN_KAKAO_IDS`에 등록된 계정만 접근할 수 있습니다.
+Bearer 인증이 필요하며 카카오 회원번호가 `ADMIN_KAKAO_IDS`, 구글 `sub`가 `ADMIN_GOOGLE_IDS`에 등록된 계정만 접근할 수 있습니다.
 
 ```text
 GET   /api/admin/ads
@@ -919,6 +939,7 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 | 400 | `INVALID_ANALYTICS_EVENT` | 분석 이벤트 또는 조회 기간 오류 |
 | 401 | `UNAUTHORIZED` | 액세스 토큰 누락, 만료 또는 변조 |
 | 401 | `INVALID_KAKAO_AUTH_CODE` | 카카오 인가 코드 오류 |
+| 401 | `INVALID_GOOGLE_AUTH_CODE` | 구글 인가 코드 만료·재사용·redirect_uri 불일치 |
 | 401 | `INVALID_REFRESH_TOKEN` | 리프레시 토큰 오류 또는 누락(본문·쿠키 모두 없음) |
 | 401 | `EXPIRED_REFRESH_TOKEN` | 리프레시 토큰 만료 |
 | 403 | `FORBIDDEN` | 접근 권한 없음 |
@@ -960,6 +981,7 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 | 409 | `MEDIA_UPLOAD_NOT_FOUND` | S3에서 업로드 결과를 찾지 못함 |
 | 429 | `TOO_MANY_EVENTS` | 이벤트 요청 한도 초과 |
 | 502 | `KAKAO_API_ERROR` | 카카오 API 통신 또는 설정 오류 |
+| 502 | `GOOGLE_API_ERROR` | 구글 API 통신 또는 설정 오류 |
 | 502 | `STORAGE_API_ERROR` | Object Storage 통신 오류 |
 | 503 | `STORAGE_NOT_CONFIGURED` | Object Storage 환경변수 미설정 |
 | 404 | `NOT_FOUND` | 존재하지 않는 경로 |

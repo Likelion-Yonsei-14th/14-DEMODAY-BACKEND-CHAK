@@ -63,6 +63,8 @@ export DB_USERNAME='root'
 export DB_PASSWORD='your-password'
 export KAKAO_CLIENT_ID='your-kakao-rest-api-key'
 export KAKAO_CLIENT_SECRET='your-client-secret-if-enabled'
+export GOOGLE_CLIENT_ID='your-google-oauth-client-id'
+export GOOGLE_CLIENT_SECRET='your-google-oauth-client-secret'
 export JWT_SECRET='at-least-32-byte-production-secret'
 export S3_BUCKET='chak-media'
 export AWS_REGION='ap-northeast-2'
@@ -72,6 +74,7 @@ export AWS_REGION='ap-northeast-2'
 #       결제 기본값 none(승인 거부). 실제 PG 연동 전에는 결제를 열지 마세요.
 # export SPRING_PROFILES_ACTIVE=prod
 export ADMIN_KAKAO_IDS='123456789,987654321'
+# export ADMIN_GOOGLE_IDS='google-sub-1,google-sub-2'
 ./gradlew bootRun
 ```
 
@@ -137,7 +140,7 @@ POST /api/public/analytics/events
 
 ## Authentication boundary
 
-- 카카오 로그인: `POST /api/auth/kakao`
+- 소셜 로그인: `POST /api/auth/kakao`, `POST /api/auth/google`
 - 토큰 재발급: `POST /api/auth/refresh`
 - 로그아웃: `POST /api/auth/logout`
 - 내 정보: `GET /api/users/me`
