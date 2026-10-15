@@ -43,6 +43,9 @@ aws cloudformation create-stack --stack-name chak-prod \
 
 값을 바꾼 뒤 서버에서 `sudo /opt/chak/run.sh` 를 실행하거나(SSM Session Manager), 다음 이미지 배포 때 반영된다.
 
+### 2-1. 찰떡 충전(토스페이먼츠)
+기본은 `CHALTTEOK_PROVIDER=none`이라 충전이 `503`으로 거부된다. 토스 연동 후 실제 충전을 열려면 서버 환경변수에 `CHALTTEOK_PROVIDER=toss`와 `TOSS_SECRET_KEY`(토스 시크릿 키, 테스트는 `test_gsk_…`)가 필요하다. 시연용 가짜 충전은 `mock`. 프론트(Vercel)에는 클라이언트 키 `VITE_TOSS_CLIENT_KEY`와 `VITE_CHALTTEOK_API=server`를 넣는다. 현재 CloudFormation 템플릿은 이 두 값을 아직 시크릿/환경변수로 주입하지 않는다(스택 업데이트 필요).
+
 ### 3. GHCR 이미지 공개
 첫 배포 후 GitHub → 조직의 Packages → `14-demoday-backend-chak` → Package settings → **Change visibility → Public**. 서버가 인증 없이 이미지를 받는다(코드는 공개 저장소라 이미지에 비밀이 없다. 비밀은 실행 시 Secrets Manager에서 읽는다).
 
