@@ -14,10 +14,10 @@ Parameters:
   CloudFrontPrefixListId:
     Type: String
     Description: ID of the AWS-managed prefix list com.amazonaws.global.cloudfront.origin-facing in this region.
-  FrontendOrigin:
+  FrontendOrigins:
     Type: String
-    Default: https://14-demoday-frontend-chak.vercel.app
-    Description: Origin of the frontend (used for CORS on the API and on the media bucket).
+    Default: https://www.chak.live,https://chak.live,https://chak-put.vercel.app,https://chak-five.vercel.app
+    Description: Comma-separated origins of the frontend (used for CORS on the API and on the media bucket).
   ImageRepository:
     Type: String
     Default: ghcr.io/likelion-yonsei-14th/14-demoday-backend-chak
@@ -115,7 +115,7 @@ Resources:
               SSEAlgorithm: AES256
       CorsConfiguration:
         CorsRules:
-          - AllowedOrigins: [!Ref FrontendOrigin]
+          - AllowedOrigins: !Split [',', !Ref FrontendOrigins]
             AllowedMethods: [PUT, GET, HEAD]
             AllowedHeaders: ['*']
             ExposedHeaders: [ETag]
@@ -214,7 +214,7 @@ Resources:
             echo "ADMIN_KAKAO_IDS=$(jq -r .ADMIN_KAKAO_IDS <<<"$APP")"
             echo "S3_BUCKET=${MediaBucket}"
             echo "AWS_REGION=$REGION"
-            echo "CORS_ALLOWED_ORIGINS=${FrontendOrigin}"
+            echo "CORS_ALLOWED_ORIGINS=${FrontendOrigins}"
             echo "PAYMENT_PROVIDER=${PaymentProvider}"
           } > /run/chak.env
           docker rm -f chak >/dev/null 2>&1 || true

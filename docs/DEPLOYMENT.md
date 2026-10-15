@@ -28,7 +28,7 @@ aws cloudformation create-stack --stack-name chak-prod \
 ```
 
 - `<pl-id>`: `aws ec2 describe-managed-prefix-lists --filters Name=prefix-list-name,Values=com.amazonaws.global.cloudfront.origin-facing`
-- 프론트 주소가 정해지면 `FrontendOrigin` 파라미터로 CORS(API·S3)를 맞춘다(스택 업데이트).
+- 프론트 주소가 정해지면 `FrontendOrigins` 파라미터(쉼표 구분)로 CORS(API·S3)를 맞춘다(스택 업데이트).
 - 결제는 기본이 `PaymentProvider=none`(승인 거부)이다. 시연용 가짜 결제를 켜려면 `mock`으로 바꾼다. **실제 돈이 오가지 않는다.**
 - 무료 플랜 계정은 RDS 백업 보관 기간을 1일까지만 허용한다(템플릿에 반영).
 
