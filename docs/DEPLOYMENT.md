@@ -49,6 +49,25 @@ aws cloudformation create-stack --stack-name chak-prod \
 ### 2-1. 찰떡 충전(토스페이먼츠)
 기본은 `CHALTTEOK_PROVIDER=none`이라 충전이 `503`으로 거부된다. 토스 연동 후 실제 충전을 열려면 서버 환경변수에 `CHALTTEOK_PROVIDER=toss`와 `TOSS_SECRET_KEY`(토스 시크릿 키, 테스트는 `test_gsk_…`)가 필요하다. 시연용 가짜 충전은 `mock`. 프론트(Vercel)에는 클라이언트 키 `VITE_TOSS_CLIENT_KEY`와 `VITE_CHALTTEOK_API=server`를 넣는다. 현재 CloudFormation 템플릿은 이 두 값을 아직 시크릿/환경변수로 주입하지 않는다(스택 업데이트 필요).
 
+### 2-2. 오류 알림(디스코드)
+서버 오류(처리되지 않은 500, 카카오·구글·토스 연동 오류)와 사용자 브라우저에서 난 오류(`POST /api/public/client-errors`)를 디스코드로 받는다.
+1. 디스코드 서버에 알림 채널을 만들고 **채널 설정 → 연동 → 웹후크 → 새 웹후크**를 만든 뒤 URL을 복사한다.
+2. Secrets Manager `chak/prod/app`에 `DISCORD_WEBHOOK_URL`(위 URL)을 추가한다. 값은 `https://discord.com/api/webhooks/`로 시작해야 하며, 다른 주소면 서버가 기동하지 않는다.
+3. 서버에서 `sudo /opt/chak/run.sh`로 컨테이너를 재시작한다. (`ALERT_ENVIRONMENT`는 prod 프로필에서 기본 `prod`로 알림 제목에 붙는다.)
+- 값이 비어 있으면 알림은 서버 로그에만 남는다.
+- 서버 `run.sh`가 시크릿의 모든 키를 환경변수로 넘기는 최신 템플릿이어야 새 키(`DISCORD_WEBHOOK_URL`)가 전달된다. 이미 떠 있는 서버는 `run.sh`를 한 번 수정해야 한다(아래 "서버 run.sh 한 번 갱신").
+
+### 2-3. 서버 생존 감시(업타임)
+외부 업타임 서비스가 `https://www.chak.live/api/public/health`를 5분마다 확인하고, 실패하면 디스코드로 알린다(서버가 통째로 꺼진 경우는 앱이 스스로 알릴 수 없다).
+- UptimeRobot(무료)이나 Better Stack에서 HTTP 모니터를 만들고 URL과 확인 주기(5분)를 넣은 뒤, 알림 채널로 디스코드를 연결한다.
+
+### 서버 run.sh 한 번 갱신
+템플릿의 UserData는 인스턴스를 처음 만들 때만 실행되므로, 이미 떠 있는 서버에는 직접 반영해야 한다. `/opt/chak/run.sh`의 `{ ... } > /run/chak.env` 블록 안(마지막 `echo` 줄 아래)에 한 줄을 추가한다. 이후에는 시크릿에 키만 추가하면 된다.
+```bash
+  jq -r 'to_entries[] | select(.value|type=="string" and length>0) | "\(.key)=\(.value)"' <<<"$APP"
+```
+수정 전에 `sudo cp /opt/chak/run.sh /opt/chak/run.sh.bak`로 백업하고, 수정 뒤 `sudo /opt/chak/run.sh`로 재시작한다.
+
 ### 3. GHCR 이미지 공개
 첫 배포 후 GitHub → 조직의 Packages → `14-demoday-backend-chak` → Package settings → **Change visibility → Public**. 서버가 인증 없이 이미지를 받는다(코드는 공개 저장소라 이미지에 비밀이 없다. 비밀은 실행 시 Secrets Manager에서 읽는다).
 

@@ -696,6 +696,32 @@ S3 버킷은 프론트 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허
 
 `INVITE_LINK_OPEN`, `MESSAGE_CREATED`는 서버에서만 자동 기록합니다. 광고 이벤트와 트래픽 이벤트는 각각 회원 또는 비회원 식별자별 분당 120건으로 제한하며, 운영 환경에서는 게이트웨이/IP 단위 제한도 함께 설정해야 합니다. IP와 User-Agent 원문은 저장하지 않습니다.
 
+### 7.4 클라이언트 오류 보고
+
+`POST /api/public/client-errors`
+
+인증: 불필요. 사용자 브라우저에서 난 오류를 운영자에게 알립니다. 서버는 내용을 **저장하지 않고** 정리(이메일·토큰·긴 비밀값 가림, 쿼리 제거)해서 운영자 알림(디스코드)으로만 보냅니다.
+
+```json
+{
+  "kind": "api_error",
+  "message": "Internal server error",
+  "route": "/prototype/my/desk",
+  "apiPath": "/api/public/desks/abc",
+  "status": 500,
+  "code": "INTERNAL_SERVER_ERROR",
+  "stack": "…",
+  "buildId": "1b72ebd",
+  "reportId": "r-ab12cd"
+}
+```
+
+- `kind`: `js_error` `unhandled_rejection` `render_error` `api_error` `network_error` (그 외 값은 `400`). `message`는 필수(최대 400자).
+- 응답 `202 Accepted`(본문 없음). 같은 접속자가 분당 10건, 전체가 분당 120건을 넘으면 `429 TOO_MANY_EVENTS`입니다.
+- 알림에는 화면 경로·요청 경로·상태·브라우저 종류(카카오톡 인앱 여부 포함)·빌드 ID·접수 코드만 실립니다. IP와 User-Agent 원문은 저장·전송하지 않습니다.
+- 같은 오류는 5분에 한 번만 알리고, 그 사이 횟수는 다음 알림에 합쳐서 표시합니다. 전체 알림은 분당 20건으로 제한합니다.
+- 서버가 직접 겪는 오류(처리되지 않은 예외, 카카오·구글·토스 연동 같은 5xx 비즈니스 오류)도 같은 채널로 알립니다.
+
 ## 8. 운영자 API
 
 Bearer 인증이 필요하며 카카오 회원번호가 `ADMIN_KAKAO_IDS`, 구글 `sub`가 `ADMIN_GOOGLE_IDS`에 등록된 계정만 접근할 수 있습니다.

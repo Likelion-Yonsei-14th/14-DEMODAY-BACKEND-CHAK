@@ -1,6 +1,14 @@
 package com.likelion.chak.exception;
 
+import com.likelion.chak.alert.AlertMessage;
+import com.likelion.chak.alert.AlertSanitizer;
+import com.likelion.chak.alert.ErrorAlertService;
+import com.likelion.chak.config.AuthenticatedUser;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +26,10 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @RestControllerAdvice
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+
+    private final ErrorAlertService alertService;
 
     @ExceptionHandler(InsufficientChaltteokException.class)
     public ResponseEntity<ChaltteokErrorResponse> handleInsufficient(InsufficientChaltteokException e) {
@@ -30,8 +41,18 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(CustomException.class)
-    public ResponseEntity<ErrorResponse> handleCustomException(CustomException e) {
+    public ResponseEntity<ErrorResponse> handleCustomException(CustomException e, HttpServletRequest request) {
         ErrorCode errorCode = e.getErrorCode();
+        if (errorCode.getStatus().is5xxServerError()) {
+            // 외부 연동(카카오·구글·토스·S3)이나 설정 문제처럼 운영자가 알아야 하는 서버 쪽 오류
+            alertService.alert(AlertMessage.builder(
+                            "서버", "서버 오류 " + errorCode.getCode(), "server|" + errorCode.getCode(), AlertMessage.Severity.ERROR)
+                    .description(errorCode.getMessage())
+                    .field("요청", request.getMethod() + " " + AlertSanitizer.path(request.getRequestURI(), 120))
+                    .field("코드", errorCode.getCode())
+                    .field("사용자", currentUserId())
+                    .build());
+        }
 
         return ResponseEntity
                 .status(errorCode.getStatus())
@@ -90,13 +111,38 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleException(Exception e) {
+    public ResponseEntity<ErrorResponse> handleException(Exception e, HttpServletRequest request) {
         log.error("Unhandled exception", e);
+        String where = request.getMethod() + " " + AlertSanitizer.path(request.getRequestURI(), 120);
+        alertService.alert(AlertMessage.builder(
+                        "서버", "처리되지 않은 오류", "server|" + e.getClass().getName() + "|" + where, AlertMessage.Severity.ERROR)
+                .description(AlertSanitizer.clean(e.getMessage(), 300))
+                .field("요청", where)
+                .field("예외", e.getClass().getSimpleName())
+                .field("위치", firstFrame(e))
+                .field("사용자", currentUserId())
+                .build());
         ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
 
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ErrorResponse.from(errorCode));
+    }
+
+    /** 로그인한 사용자의 숫자 ID만 알린다(이름·이메일 제외). */
+    private static String currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getPrincipal() instanceof AuthenticatedUser user ? String.valueOf(user.userId()) : null;
+    }
+
+    private static String firstFrame(Throwable e) {
+        for (StackTraceElement frame : e.getStackTrace()) {
+            if (frame.getClassName().startsWith("com.likelion.chak")) {
+                return frame.getClassName().substring(frame.getClassName().lastIndexOf('.') + 1)
+                        + "." + frame.getMethodName() + ":" + frame.getLineNumber();
+            }
+        }
+        return null;
     }
 
     private ResponseEntity<ErrorResponse> respond(ErrorCode errorCode) {
