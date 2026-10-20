@@ -15,6 +15,7 @@
 | V6 | payment_orders, payment_order_items, ad_unlocks |
 | V7 | chaltteok_wallets, chaltteok_charges, chaltteok_ledger |
 | V8 | users: `kakao_id` → `provider` + `provider_user_id`, 유일 제약을 (provider, provider_user_id)로 변경 (기존 회원은 모두 KAKAO) |
+| V9 | users `last_login_at`·`deleted_at`(탈퇴 익명화), traffic_events `country`·`region`(접속 지역, IP 미저장), admin_audit_logs |
 
 ## 관계도
 
@@ -274,3 +275,10 @@ UNIQUE `(advertisement_id, event_type, session_id)` — 재시도 중복 방지.
 | 지갑 최초 생성 경합 | `INSERT IGNORE`(유니크 제약 위에서 예외 없이 1건으로 합쳐짐) |
 | 결제 안 끝난 주문 폭주 | 사용자당 최근 1시간 `READY` 주문 10개 상한. 지갑 행 잠금으로 직렬화해 우회 불가 |
 | 데드락 | 잠금 순서를 충전 주문 → 지갑으로 고정(구매는 지갑만) |
+
+## 어드민·통계 (V9)
+
+- `users.deleted_at`: 값이 있으면 탈퇴 처리된 익명 계정입니다. 개인정보(이름·이메일·프로필)를 지우고 `provider_user_id`를 `deleted:{id}`로 바꿔 같은 로그인으로 재가입하면 새 계정이 됩니다. 행은 응원·결제 장부의 FK 때문에 남습니다.
+- `users.last_login_at`: 마지막 로그인 시각(관리자 화면용).
+- `traffic_events.country`, `region`: 접속 국가(ISO 2자리)와 시·도 코드. 호스팅이 알려주는 값만 저장하고 IP는 저장하지 않습니다. 인덱스 `(event_type, created_at, region)`.
+- `admin_audit_logs`: 관리자 작업 기록(`admin_user_id`, `action`, `target_type`, `target_id`, `detail`, `created_at`).
