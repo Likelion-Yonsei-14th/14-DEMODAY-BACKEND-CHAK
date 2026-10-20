@@ -69,6 +69,7 @@ export JWT_SECRET='at-least-32-byte-production-secret'
 export S3_BUCKET='chak-media'
 export AWS_REGION='ap-northeast-2'
 # 개발: PAYMENT_PROVIDER 기본값은 mock(실제로 돈이 오가지 않는 가짜 결제)
+# 운영자 알림: DISCORD_WEBHOOK_URL(디스코드 웹훅, 비우면 로그로만), ALERT_ENVIRONMENT(알림 제목에 붙는 환경 이름)
 # 찰떡 충전: CHALTTEOK_PROVIDER=mock(기본)|toss|none, 토스는 TOSS_SECRET_KEY 필요
 # 운영: 아래 프로필을 켜면 기본 JWT 시크릿으로는 기동 실패, 쿠키 Secure 기본 true, Swagger 기본 비활성,
 #       결제 기본값 none(승인 거부). 실제 PG 연동 전에는 결제를 열지 마세요.
