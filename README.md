@@ -70,6 +70,7 @@ export S3_BUCKET='chak-media'
 export AWS_REGION='ap-northeast-2'
 # 개발: PAYMENT_PROVIDER 기본값은 mock(실제로 돈이 오가지 않는 가짜 결제)
 # 운영자 알림: DISCORD_WEBHOOK_URL(디스코드 웹훅, 비우면 로그로만), ALERT_ENVIRONMENT(알림 제목에 붙는 환경 이름)
+# prod에서는 AWS 시크릿 chak/prod/app의 모든 문자열 키를 시작 시 설정으로 읽는다(환경변수가 우선, CHAK_SECRETS_ID로 변경)
 # 찰떡 충전: CHALTTEOK_PROVIDER=mock(기본)|toss|none, 토스는 TOSS_SECRET_KEY 필요
 # 운영: 아래 프로필을 켜면 기본 JWT 시크릿으로는 기동 실패, 쿠키 Secure 기본 true, Swagger 기본 비활성,
 #       결제 기본값 none(승인 거부). 실제 PG 연동 전에는 결제를 열지 마세요.
