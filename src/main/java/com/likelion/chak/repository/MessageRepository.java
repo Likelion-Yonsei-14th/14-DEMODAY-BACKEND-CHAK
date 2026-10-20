@@ -13,6 +13,18 @@ import java.time.Instant;
 
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
+    long countByAuthorUserIdAndStatusNot(Long userId, MessageStatus status);
+
+    long countByStatusNot(MessageStatus status);
+
+    @Query("select message.createdAt from Message message where message.createdAt >= :from and message.createdAt < :to")
+    java.util.List<Instant> findCreatedAtBetween(@Param("from") Instant from, @Param("to") Instant to);
+
+    /** 탈퇴한 회원이 쓴 응원의 표시 이름을 바꾼다(응원은 남기고 작성자만 익명으로). */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Message message set message.nicknameOverride = :name where message.authorUser.id = :userId")
+    int anonymizeAuthor(@Param("userId") Long userId, @Param("name") String name);
+
     Slice<Message> findAllByAuthorUserIdAndStatusNotOrderByCreatedAtDescIdDesc(
             Long userId, MessageStatus status, Pageable pageable);
 

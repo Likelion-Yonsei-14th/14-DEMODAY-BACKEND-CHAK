@@ -38,6 +38,8 @@ public enum ErrorCode {
     IDEMPOTENCY_KEY_REUSED(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_REUSED", "같은 요청 키를 다른 내용으로 사용할 수 없습니다."),
     DUPLICATE_PAYMENT(HttpStatus.CONFLICT, "DUPLICATE_PAYMENT", "이미 사용된 결제입니다."),
     CONCURRENT_REQUEST(HttpStatus.CONFLICT, "CONCURRENT_REQUEST", "요청이 겹쳐 처리하지 못했습니다. 잠시 후 다시 시도해주세요."),
+    BALANCE_REMAINING(HttpStatus.CONFLICT, "BALANCE_REMAINING", "남은 찰떡이 있는 회원입니다. 소멸에 동의하고 진행해야 합니다."),
+    ADMIN_ACCOUNT_PROTECTED(HttpStatus.CONFLICT, "ADMIN_ACCOUNT_PROTECTED", "운영자 계정은 탈퇴 처리할 수 없습니다."),
     GUEST_IMAGE_NOT_ALLOWED(HttpStatus.FORBIDDEN, "GUEST_IMAGE_NOT_ALLOWED", "비회원은 사진을 첨부할 수 없습니다. 로그인해주세요."),
     PAYMENT_REQUIRED(HttpStatus.PAYMENT_REQUIRED, "PAYMENT_REQUIRED", "결제가 필요한 항목이 포함되어 있습니다."),
     INVALID_ORDER(HttpStatus.BAD_REQUEST, "INVALID_ORDER", "주문 항목이 올바르지 않습니다."),

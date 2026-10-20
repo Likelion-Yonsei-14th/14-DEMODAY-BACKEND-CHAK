@@ -33,11 +33,26 @@ public class AnalyticsService {
     private final AdvertisementEventRepository advertisementEventRepository;
     private final ObjectMapper objectMapper;
 
+    /** 접속 위치(국가·시도 코드). 호스팅 업체가 알려주는 값만 쓰고 IP는 다루지 않는다. */
+    public record Geo(String country, String region) {
+
+        public static Geo fromHeaders(String country, String region) {
+            String c = country != null && country.matches("^[A-Za-z]{2}$") ? country.toUpperCase() : null;
+            String r = region != null && region.strip().matches("^[A-Za-z0-9 _.-]{1,40}$") ? region.strip() : null;
+            return c == null && r == null ? null : new Geo(c, r);
+        }
+    }
+
+    public EventRecordedResponse record(UserAccount user, GuestIdentity guest, TrafficEventRequest request) {
+        return record(user, guest, request, null);
+    }
+
     @Transactional
     public EventRecordedResponse record(
             UserAccount user,
             GuestIdentity guest,
-            TrafficEventRequest request) {
+            TrafficEventRequest request,
+            Geo geo) {
         if (request.eventType() != TrafficEventType.PAGE_VIEW
                 && request.eventType() != TrafficEventType.MESSAGE_COMPOSE_STARTED) {
             throw new CustomException(ErrorCode.INVALID_ANALYTICS_EVENT);
@@ -65,7 +80,9 @@ public class AnalyticsService {
                 normalize(request.referrer()),
                 normalize(request.resourceType()),
                 normalize(request.resourceKey()),
-                metadata);
+                metadata,
+                geo == null ? null : geo.country(),
+                geo == null ? null : geo.region());
         TrafficEvent event = trafficEventRepository.findByEventId(eventId)
                 .orElseThrow(() -> new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
         return new EventRecordedResponse(event.getId());

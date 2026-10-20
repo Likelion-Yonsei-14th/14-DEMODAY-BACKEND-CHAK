@@ -20,4 +20,9 @@ public interface PersonalDeskRepository extends JpaRepository<PersonalDesk, Long
     Optional<PersonalDesk> findForUpdateByOwnerId(Long ownerId);
 
     boolean existsByOwnerId(Long ownerId);
+
+    @org.springframework.data.jpa.repository.Query("select desk.createdAt from PersonalDesk desk where desk.createdAt >= :from and desk.createdAt < :to")
+    java.util.List<java.time.Instant> findCreatedAtBetween(
+            @org.springframework.data.repository.query.Param("from") java.time.Instant from,
+            @org.springframework.data.repository.query.Param("to") java.time.Instant to);
 }

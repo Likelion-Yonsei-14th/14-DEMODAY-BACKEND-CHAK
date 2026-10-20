@@ -79,6 +79,12 @@ public class PersonalDesk {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    /** 주인이 탈퇴했을 때: 새 응원을 받지 않게 닫고 주인 이름을 지운다. 받은 응원은 그대로 남는다. */
+    public void closeForWithdrawnOwner() {
+        this.roomClosed = true;
+        this.displayName = UserAccount.WITHDRAWN_NAME;
+    }
+
     private PersonalDesk(
             UserAccount owner,
             UserAccount creator,
