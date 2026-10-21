@@ -724,7 +724,7 @@ S3 버킷은 프론트 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허
 
 ## 8. 운영자 API
 
-Bearer 인증이 필요하며 카카오 회원번호가 `ADMIN_KAKAO_IDS`, 구글 `sub`가 `ADMIN_GOOGLE_IDS`에 등록된 계정만 접근할 수 있습니다.
+Bearer 인증이 필요하며 `users.admin`이 켜진 계정만 접근할 수 있습니다. 권한은 어드민 화면의 운영자 관리(8.4)로 부여·회수하고, 환경변수 `ADMIN_KAKAO_IDS`·`ADMIN_GOOGLE_IDS`에 있는 계정은 로그인할 때 항상 운영자가 됩니다(회수해도 다음 로그인에 복구되므로, 환경변수는 비상용으로만 둡니다).
 
 ```text
 GET   /api/admin/ads
@@ -830,6 +830,21 @@ GET /api/admin/stats/regions?from=…&to=…                     접속 지역(�
 - 일별: `date, visitors(회원+비회원 고유 접속자), memberVisitors, guestVisitors, pageViews, signups, desksCreated, messagesCreated, chargeAmount(승인된 충전 금액)`. 활동이 없는 날도 0으로 포함하고, 응답 앞부분에 전체 `totalUsers`(탈퇴 제외)·`totalDesks`·`totalMessages`가 옵니다.
 - 지역: `country, region, regionName(서울·부산 등), visitors, pageViews`를 조회수 순으로, 위치를 알 수 없는 조회는 `unknownPageViews`로 따로 셉니다.
 - **접속자·지역은 프론트가 `POST /api/public/analytics/events`로 `PAGE_VIEW`를 보낼 때만 집계됩니다.** 위치는 호스팅(Vercel)이 요청에 붙여 주는 `X-Vercel-IP-Country`, `X-Vercel-IP-Country-Region` 값(국가·시도 코드)만 저장하며 **IP는 저장하지 않습니다.**
+
+### 8.4 운영자 관리
+
+```text
+GET    /api/admin/admins                       운영자 목록 + 대기 중인 초대
+POST   /api/admin/admins                       { "email": "name@example.com" } 권한 부여
+DELETE /api/admin/admins/users/{userId}        운영자 권한 회수
+DELETE /api/admin/admins/invites/{inviteId}    대기 중인 초대 취소
+```
+
+- 응답은 모두 `{ admins: [회원 요약], invites: [{ id, email, createdAt, consumedAt, bootstrap }] }`입니다.
+- 부여는 **구글이 확인한 이메일**에만 적용됩니다. 같은 이메일의 구글 계정이 이미 있으면 바로 운영자가 되고, 없으면 초대로 저장했다가 그 이메일로 처음 로그인할 때 적용합니다. 이메일은 소문자로 정규화하며 같은 요청을 반복해도 결과는 같습니다. 카카오는 이메일을 받지 않아 적용되지 않습니다.
+- 본인 권한은 회수할 수 없습니다(`409 ADMIN_SELF_REVOKE`). 운영자가 아닌 회원을 회수하면 `409 NOT_AN_ADMIN`, 형식이 틀린 이메일은 `400`입니다.
+- 최초 운영자는 마이그레이션(V10)이 `mj0324@yonsei.ac.kr` 초대를 심어 둡니다.
+- 모든 작업은 `admin_audit_logs`에 남습니다(`GRANT_ADMIN`, `INVITE_ADMIN`, `REVOKE_ADMIN`, `CANCEL_ADMIN_INVITE`).
 
 ## 9. 보낸 응원·반응·신고 (작성자·방문자)
 

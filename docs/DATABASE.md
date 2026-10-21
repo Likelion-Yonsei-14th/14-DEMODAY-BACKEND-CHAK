@@ -15,6 +15,7 @@
 | V6 | payment_orders, payment_order_items, ad_unlocks |
 | V7 | chaltteok_wallets, chaltteok_charges, chaltteok_ledger |
 | V8 | users: `kakao_id` → `provider` + `provider_user_id`, 유일 제약을 (provider, provider_user_id)로 변경 (기존 회원은 모두 KAKAO) |
+| V10 | admin_invites(이메일로 운영자 권한 초대, 최초 운영자 시드) |
 | V9 | users `last_login_at`·`deleted_at`(탈퇴 익명화), traffic_events `country`·`region`(접속 지역, IP 미저장), admin_audit_logs |
 
 ## 관계도
@@ -42,7 +43,7 @@ traffic_events (user 또는 guest, FK 없는 resource_key)
 | display_name | VARCHAR(50) | 제공자 닉네임, 로그인마다 갱신 |
 | email | VARCHAR(320) | NULL 가능 |
 | profile_image_url | VARCHAR(1000) | NULL 가능 |
-| admin | BOOLEAN | 기본 FALSE, `ADMIN_KAKAO_IDS`·`ADMIN_GOOGLE_IDS` 로그인 시 갱신 |
+| admin | BOOLEAN | 기본 FALSE, 어드민 화면에서 부여·회수. `ADMIN_*_IDS` 계정은 로그인 때 켜짐(끄지는 않음) |
 | created_at, updated_at | DATETIME(6) | |
 
 ### guest_identities
@@ -282,3 +283,8 @@ UNIQUE `(advertisement_id, event_type, session_id)` — 재시도 중복 방지.
 - `users.last_login_at`: 마지막 로그인 시각(관리자 화면용).
 - `traffic_events.country`, `region`: 접속 국가(ISO 2자리)와 시·도 코드. 호스팅이 알려주는 값만 저장하고 IP는 저장하지 않습니다. 인덱스 `(event_type, created_at, region)`.
 - `admin_audit_logs`: 관리자 작업 기록(`admin_user_id`, `action`, `target_type`, `target_id`, `detail`, `created_at`).
+
+## 운영자 초대 (V10)
+
+- `admin_invites`: `email`(소문자, UNIQUE), `created_by`(NULL이면 최초 설정), `created_at`, `consumed_at`, `consumed_user_id`. 구글이 확인한 같은 이메일로 로그인하면 `users.admin`을 켜고 `consumed_*`를 채웁니다. 적용된 초대는 목록에서 숨기고 행은 기록으로 남깁니다.
+- 마이그레이션이 `mj0324@yonsei.ac.kr`을 첫 운영자로 심습니다.

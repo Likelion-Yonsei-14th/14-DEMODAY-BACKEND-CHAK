@@ -12,6 +12,10 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
 
     long countByDeletedAtIsNull();
 
+    java.util.List<UserAccount> findAllByAdminTrueAndDeletedAtIsNullOrderByCreatedAtAsc();
+
+    java.util.List<UserAccount> findAllByProviderAndEmailIgnoreCaseAndDeletedAtIsNull(AuthProvider provider, String email);
+
     @org.springframework.data.jpa.repository.Query("select user.createdAt from UserAccount user where user.createdAt >= :from and user.createdAt < :to")
     java.util.List<java.time.Instant> findCreatedAtBetween(
             @org.springframework.data.repository.query.Param("from") java.time.Instant from,

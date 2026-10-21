@@ -65,4 +65,16 @@ public final class AdminDtos {
 
     public record RegionStatsResponse(LocalDate from, LocalDate to, List<RegionStat> items, long unknownPageViews) {
     }
+
+    public record AdminInviteEntry(Long id, String email, Instant createdAt, Instant consumedAt, boolean bootstrap) {
+    }
+
+    public record AdminAccessResponse(List<UserSummary> admins, List<AdminInviteEntry> invites) {
+    }
+
+    public record GrantAdminRequest(
+            @jakarta.validation.constraints.NotBlank
+            @jakarta.validation.constraints.Email
+            @jakarta.validation.constraints.Size(max = 320) String email) {
+    }
 }
