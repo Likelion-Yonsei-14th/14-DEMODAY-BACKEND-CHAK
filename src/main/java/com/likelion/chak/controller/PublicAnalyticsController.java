@@ -51,19 +51,27 @@ public class PublicAnalyticsController {
     public ResponseEntity<EventRecordedResponse> record(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @CookieValue(name = "${chak.guest-cookie.name}", required = false) String guestKey,
-            @RequestHeader(name = "X-Vercel-IP-Country", required = false) String country,
-            @RequestHeader(name = "X-Vercel-IP-Country-Region", required = false) String region,
+            @RequestHeader(name = "X-Chak-Geo-Country", required = false) String chakCountry,
+            @RequestHeader(name = "X-Chak-Geo-Region", required = false) String chakRegion,
+            @RequestHeader(name = "X-Vercel-IP-Country", required = false) String vercelCountry,
+            @RequestHeader(name = "X-Vercel-IP-Country-Region", required = false) String vercelRegion,
             @Valid @RequestBody TrafficEventRequest request) {
         UserAccount user = principal == null ? null : authService.getUser(principal.userId());
         GuestSession guestSession = user == null ? guestIdentityService.resolveOrCreate(guestKey) : null;
         GuestIdentity guest = guestSession == null ? null : guestSession.getGuestIdentity();
-        EventRecordedResponse response = analyticsService.record(user, guest, request, AnalyticsService.Geo.fromHeaders(country, region));
+        EventRecordedResponse response = analyticsService.record(user, guest, request, AnalyticsService.Geo.fromHeaders(
+                firstNonBlank(chakCountry, vercelCountry), firstNonBlank(chakRegion, vercelRegion)));
 
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.CREATED);
         if (guestSession != null && guestSession.isCreated()) {
             builder.header(HttpHeaders.SET_COOKIE, createGuestCookie(guest.getGuestKey()).toString());
         }
         return builder.body(response);
+    }
+
+    /** 프론트 호스팅의 미들웨어가 붙인 값을 우선하고, 호스팅이 직접 붙인 값을 대신 쓴다. */
+    private static String firstNonBlank(String preferred, String fallback) {
+        return preferred != null && !preferred.isBlank() ? preferred : fallback;
     }
 
     private ResponseCookie createGuestCookie(String guestKey) {
