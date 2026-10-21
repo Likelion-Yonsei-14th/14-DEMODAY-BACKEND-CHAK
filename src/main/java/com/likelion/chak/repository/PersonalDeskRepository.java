@@ -9,12 +9,25 @@ import java.util.Optional;
 
 public interface PersonalDeskRepository extends JpaRepository<PersonalDesk, Long> {
 
-    Optional<PersonalDesk> findBySupporterToken(String supporterToken);
+    Optional<PersonalDesk> findBySupporterTokenAndDeletedAtIsNull(String supporterToken);
+
+    Optional<PersonalDesk> findByClaimToken(String claimToken);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<PersonalDesk> findForUpdateByClaimToken(String claimToken);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<PersonalDesk> findForUpdateById(Long id);
+
+    java.util.List<PersonalDesk> findAllByCreatorIdAndClaimStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+            Long creatorId, com.likelion.chak.domain.ClaimStatus claimStatus);
+
+    long countByCreatorIdAndClaimStatusAndDeletedAtIsNull(Long creatorId, com.likelion.chak.domain.ClaimStatus claimStatus);
 
     Optional<PersonalDesk> findByOwnerId(Long ownerId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<PersonalDesk> findForUpdateBySupporterToken(String supporterToken);
+    Optional<PersonalDesk> findForUpdateBySupporterTokenAndDeletedAtIsNull(String supporterToken);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<PersonalDesk> findForUpdateByOwnerId(Long ownerId);

@@ -15,6 +15,7 @@
 | V6 | payment_orders, payment_order_items, ad_unlocks |
 | V7 | chaltteok_wallets, chaltteok_charges, chaltteok_ledger |
 | V8 | users: `kakao_id` → `provider` + `provider_user_id`, 유일 제약을 (provider, provider_user_id)로 변경 (기존 회원은 모두 KAKAO) |
+| V11 | personal_desks `claim_token`(넘겨받기 링크, UNIQUE)·`claimed_at`·`deleted_at`(삭제 표시) |
 | V10 | admin_invites(이메일로 운영자 권한 초대, 최초 운영자 시드) |
 | V9 | users `last_login_at`·`deleted_at`(탈퇴 익명화), traffic_events `country`·`region`(접속 지역, IP 미저장), admin_audit_logs |
 
@@ -62,7 +63,10 @@ traffic_events (user 또는 guest, FK 없는 resource_key)
 | owner_id | BIGINT FK users | UNIQUE, 계정당 1개 |
 | creator_id | BIGINT FK users | NOT NULL |
 | display_name | VARCHAR(50) | |
-| claim_status | VARCHAR(20) | `UNCLAIMED` / `CLAIMED` (API 미노출) |
+| claim_status | VARCHAR(20) | `UNCLAIMED`(친구가 대신 만들어 아직 주인이 없음) / `CLAIMED` |
+| claim_token | VARCHAR(36) | UNIQUE, 넘겨받기 링크 토큰. `UNCLAIMED`일 때만 값이 있고 넘겨받거나 삭제하면 비움 (V11) |
+| claimed_at | DATETIME(6) | 넘겨받은 시각 (V11) |
+| deleted_at | DATETIME(6) | 값이 있으면 삭제된 책상. 주인 연결(`owner_id`)을 풀고 어디서도 조회되지 않음, 응원 기록은 남김 (V11) |
 | read_mode_type | VARCHAR(20) | `DAILY` / `TIME_CAPSULE` |
 | daily_unlock_time | TIME(6) | DAILY일 때 필수 |
 | capsule_unlock_at | DATETIME(6) | TIME_CAPSULE일 때 필수 |

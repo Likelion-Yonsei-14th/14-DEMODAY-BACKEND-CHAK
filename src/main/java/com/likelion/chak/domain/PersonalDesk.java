@@ -73,6 +73,15 @@ public class PersonalDesk {
     @Column(nullable = false, unique = true, updatable = false, length = 36)
     private String supporterToken;
 
+    /** 넘겨받기 전에만 값이 있다. 이 링크를 받은 사람이 수령자로 책상을 가져간다. */
+    @Column(unique = true, length = 36)
+    private String claimToken;
+
+    private Instant claimedAt;
+
+    /** 값이 있으면 삭제된 책상이다. 응원 기록은 남기지만 어디서도 조회되지 않는다. */
+    private Instant deletedAt;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -105,6 +114,9 @@ public class PersonalDesk {
         this.defaultMessageVisibility = MessageVisibility.PRIVATE;
         this.roomClosed = false;
         this.supporterToken = UUID.randomUUID().toString();
+        if (claimStatus == ClaimStatus.UNCLAIMED) {
+            this.claimToken = UUID.randomUUID().toString();
+        }
     }
 
     public static PersonalDesk createClaimed(
@@ -137,6 +149,26 @@ public class PersonalDesk {
                 readModeType,
                 dailyUnlockTime,
                 capsuleUnlockAt);
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    /** 수령자가 책상을 넘겨받는다. 링크는 즉시 무효가 되고, 만든 사람의 관리 권한은 끝난다. */
+    public void claim(UserAccount newOwner, Instant at) {
+        this.owner = newOwner;
+        this.claimStatus = ClaimStatus.CLAIMED;
+        this.claimToken = null;
+        this.claimedAt = at;
+    }
+
+    /** 현재 주인(넘겨받기 전에는 만든 사람)이 책상을 지운다. 주인 연결을 풀어 새 책상을 만들 수 있게 한다. */
+    public void softDelete(Instant at) {
+        this.deletedAt = at;
+        this.owner = null;
+        this.claimToken = null;
+        this.roomClosed = true;
     }
 
     public void closeRoom() {

@@ -170,13 +170,13 @@ public class DeskService {
 
     @Transactional(readOnly = true)
     public PersonalDesk findBySupporterToken(String supporterToken) {
-        return personalDeskRepository.findBySupporterToken(supporterToken)
+        return personalDeskRepository.findBySupporterTokenAndDeletedAtIsNull(supporterToken)
                 .orElseThrow(() -> new CustomException(ErrorCode.DESK_NOT_FOUND));
     }
 
     @Transactional
     public PersonalDesk findBySupporterTokenForUpdate(String supporterToken) {
-        return personalDeskRepository.findForUpdateBySupporterToken(supporterToken)
+        return personalDeskRepository.findForUpdateBySupporterTokenAndDeletedAtIsNull(supporterToken)
                 .orElseThrow(() -> new CustomException(ErrorCode.DESK_NOT_FOUND));
     }
 

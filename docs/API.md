@@ -26,7 +26,7 @@
 | --- | --- |
 | `POST /api/auth/kakao`, `POST /api/auth/google`, `POST /api/auth/refresh` | 불필요 |
 | `/api/public/**` | 선택 (Bearer가 있으면 회원, 없으면 `chak_guest_id` 쿠키의 비회원으로 처리) |
-| `POST /api/auth/logout`, `/api/users/**`, `/api/desks/me/**`, `/api/media/**` | 필수 |
+| `POST /api/auth/logout`, `/api/users/**`, `/api/desks/me/**`, `/api/desks/for-friend`, `/api/desks/{id}`(삭제), `/api/claims/**`, `/api/media/**` | 필수 |
 | `/api/admin/**` | 필수 + 운영자 |
 
 > 주의: `/api/public/**`도 `Authorization` 헤더가 **있으면** 토큰을 검증합니다. 만료·변조된 토큰을 보내면 공개 API라도 `401 UNAUTHORIZED`가 반환되므로, 프론트는 401을 받으면 `/api/auth/refresh` 후 재시도하거나 헤더 없이 비회원으로 재요청해야 합니다.
@@ -568,6 +568,30 @@ DELETE /api/desks/me/messages/{deliveryId}
 
 `deliveryId`는 해당 작성자의 대표(가장 최근) 편지입니다. 삭제된 편지만 남긴 작성자는 목록에 나오지 않습니다.
 
+### 5.10 친구를 위한 책상(만들기·넘겨받기·삭제)
+
+친구가 대신 만든 책상을 받는 사람이 넘겨받는 흐름입니다. 모두 로그인이 필요합니다.
+
+```text
+POST   /api/desks/for-friend      친구를 위한 책상 만들기 (본문은 5.1과 같음, displayName은 받는 사람 이름)
+GET    /api/desks/for-friend      내가 만든, 아직 전달하지 않은 책상 목록
+DELETE /api/desks/{deskId}        책상 삭제(현재 주인만)
+GET    /api/claims/{claimToken}   받은 링크 미리보기
+POST   /api/claims/{claimToken}   넘겨받기 { "confirmedRecipient": true }
+```
+
+- 만들면 링크가 둘 생깁니다. 응원을 남길 친구들에게는 `supporterToken`(기존 공유 링크), 책상의 주인에게는 `claimToken`을 전달합니다. 응답은 `FriendDeskResponse`(`id`, `displayName`, `supporterToken`, `claimToken`, 열람 방식, `messageCount`, `friendCount`, `createdAt`)입니다.
+- **만든 사람은 응원 내용을 읽을 수 없습니다.** 받은 응원 API(`/api/desks/me/**`)는 주인 전용이라 열리지 않고, 만든 사람은 개수(`messageCount`, `friendCount`)만 봅니다.
+- 한 사람이 아직 전달하지 않은 책상을 10개까지만 만들 수 있습니다(`409 TOO_MANY_FRIEND_DESKS`).
+- **미리보기**는 `displayName`, `creatorName`, 열람 방식, `messageCount`, `friendCount`만 보여 줍니다. 내용은 보여 주지 않습니다.
+- **넘겨받기**는 `confirmedRecipient`가 `true`일 때만 처리합니다. 프론트는 "OO님 본인이 맞나요?"를 물은 뒤 보내야 하며, 없거나 false면 `400 CLAIM_CONFIRMATION_REQUIRED`입니다.
+  - 응답은 `{ desk: 주인용 책상(5.2와 같음), messageCount, friendCount }`입니다. 넘겨받기 전에 쌓인 응원은 "먼저 와 있던 응원"으로 남습니다.
+  - 링크는 한 번만 쓸 수 있고(`claimToken`을 비웁니다), 쓴 뒤·삭제된 뒤·없는 링크는 `404 CLAIM_NOT_AVAILABLE`입니다. 같은 링크로 동시에 시도해도 한 명만 성공합니다.
+  - 이미 자기 책상이 있는 사람은 넘겨받을 수 없습니다(`409 DESK_ALREADY_EXISTS`). 책상은 계정당 하나이고 합치기는 지원하지 않습니다.
+  - 만든 사람 본인이 넘겨받는 것은 허용합니다.
+  - 넘겨받으면 만든 사람의 권한은 끝나고 일반 서포터가 됩니다.
+- **삭제**는 현재 주인만 할 수 있습니다. 넘겨받기 전에는 만든 사람, 넘겨받은 뒤에는 받은 사람입니다(본인이 만든 책상도 같습니다). 주인이 아니거나 없는 책상은 `404 DESK_NOT_FOUND`입니다. 삭제하면 서포터 링크·넘겨받기 링크가 모두 열리지 않고, 삭제한 주인은 새 책상을 만들 수 있습니다. 응원 기록은 DB에 남습니다.
+
 ## 6. 이미지 업로드 API
 
 Bearer 인증이 필요합니다. 지원 형식은 JPEG, PNG, WebP, GIF이며 프로필은 최대 5MB, 카드는 최대 10MB입니다.
@@ -1025,7 +1049,10 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 | 404 | `MEDIA_NOT_FOUND` | 소유한 미디어 자산이 없음 |
 | 404 | `ADVERTISEMENT_NOT_FOUND` | 광고 없음 |
 | 409 | `DESK_CLOSED` | 편지 접수 종료 |
-| 409 | `DESK_ALREADY_EXISTS` | 계정에 이미 책상이 있음 |
+| 409 | `DESK_ALREADY_EXISTS` | 계정에 이미 책상이 있음(친구 책상 넘겨받기 포함) |
+| 400 | `CLAIM_CONFIRMATION_REQUIRED` | 넘겨받기에 본인 확인(`confirmedRecipient: true`)이 없음 |
+| 404 | `CLAIM_NOT_AVAILABLE` | 이미 쓴·삭제된·없는 넘겨받기 링크 |
+| 409 | `TOO_MANY_FRIEND_DESKS` | 아직 전달하지 않은 친구 책상이 10개 |
 | 409 | `MESSAGE_NOT_READ` | 읽지 않은 편지를 바구니로 이동 시도 |
 | 409 | `MESSAGE_NOT_DELETABLE` | 이미 읽혔거나 공개 편지가 아니어서 작성자가 삭제할 수 없음 |
 | 401 | `IDENTITY_REQUIRED` | 작성자를 확인할 수 없음(로그인 또는 비회원 쿠키 필요) |
@@ -1067,7 +1094,7 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 ## 12. 아직 제공하지 않는 API
 
 - **교실 단위 응원**(교실·사물함·칠판·교실 Wrapped, 교실 상품 결제): Post-MVP 범위로 구현을 보류했습니다.
-- 책상 연결 코드(`다른 응원 공간 연결`), 친구를 위한 책상 만들기(Claim), 개인 Wrapped, 학생 혜택
+- 책상 연결 코드(`다른 응원 공간 연결`), 개인 Wrapped, 학생 혜택, 이미 책상이 있는 사람에게 친구 책상을 합치기
 - 바구니에서 편지 꺼내기, 책상 주인의 편지 삭제 화면(삭제 API는 있음)
 - 이미지 삭제 및 미완료 업로드 정리 배치(비회원 이미지 첨부는 정책상 허용하지 않음)
 - 실제 결제 승인(PG 연동), 결제 환불, 알림 발송
