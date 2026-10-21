@@ -11,6 +11,9 @@ import com.likelion.chak.dto.AdminDtos.RegionStatsResponse;
 import com.likelion.chak.dto.AdminDtos.UserDetail;
 import com.likelion.chak.dto.AdminDtos.UserSummary;
 import com.likelion.chak.dto.AdminDtos.WithdrawRequest;
+import com.likelion.chak.dto.AdminDtos.AdminAccessResponse;
+import com.likelion.chak.dto.AdminDtos.GrantAdminRequest;
+import com.likelion.chak.service.AdminAccessService;
 import com.likelion.chak.service.AdminStatsService;
 import com.likelion.chak.service.AdminUserService;
 import com.likelion.chak.service.AdvertisementService;
@@ -52,6 +55,7 @@ public class AdminController {
     private final ReportAdminService reportAdminService;
     private final AdminUserService adminUserService;
     private final AdminStatsService adminStatsService;
+    private final AdminAccessService adminAccessService;
 
     @GetMapping("/ads")
     public ResponseEntity<List<AdvertisementResponse>> getAdvertisements(
@@ -169,5 +173,35 @@ public class AdminController {
             @RequestParam(name = "to", required = false) java.time.LocalDate to) {
         authService.getAdmin(principal.userId());
         return ResponseEntity.ok(adminStatsService.regions(from, to));
+    }
+
+    @GetMapping("/admins")
+    public ResponseEntity<AdminAccessResponse> getAdmins(@AuthenticationPrincipal AuthenticatedUser principal) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adminAccessService.list());
+    }
+
+    @PostMapping("/admins")
+    public ResponseEntity<AdminAccessResponse> grantAdmin(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @Valid @RequestBody GrantAdminRequest request) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adminAccessService.grant(principal.userId(), request.email()));
+    }
+
+    @DeleteMapping("/admins/users/{userId}")
+    public ResponseEntity<AdminAccessResponse> revokeAdmin(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("userId") Long userId) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adminAccessService.revoke(principal.userId(), userId));
+    }
+
+    @DeleteMapping("/admins/invites/{inviteId}")
+    public ResponseEntity<AdminAccessResponse> cancelAdminInvite(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("inviteId") Long inviteId) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adminAccessService.cancelInvite(principal.userId(), inviteId));
     }
 }

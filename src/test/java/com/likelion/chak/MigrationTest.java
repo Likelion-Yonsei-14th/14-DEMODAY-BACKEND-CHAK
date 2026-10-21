@@ -28,6 +28,12 @@ class MigrationTest {
             assertThat(tables.next()).isTrue();
             assertThat(columns.next()).isTrue();
         }
+        try (var connection = DriverManager.getConnection(url, "sa", "");
+             var rows = connection.createStatement().executeQuery(
+                     "SELECT COUNT(*) FROM admin_invites WHERE email = 'mj0324@yonsei.ac.kr' AND created_by IS NULL")) {
+            rows.next();
+            assertThat(rows.getInt(1)).isEqualTo(1);
+        }
     }
 
     @Test

@@ -24,6 +24,7 @@ public class AuthService {
     private final List<OAuthClient> clients;
     private final UserAccountRepository userAccountRepository;
     private final TokenService tokenService;
+    private final AdminAccessService adminAccessService;
     private final String adminKakaoIds;
     private final String adminGoogleIds;
 
@@ -31,11 +32,13 @@ public class AuthService {
             List<OAuthClient> oauthClients,
             UserAccountRepository userAccountRepository,
             TokenService tokenService,
+            AdminAccessService adminAccessService,
             @Value("${chak.admin-kakao-ids:}") String adminKakaoIds,
             @Value("${chak.admin-google-ids:}") String adminGoogleIds) {
         this.clients = oauthClients;
         this.userAccountRepository = userAccountRepository;
         this.tokenService = tokenService;
+        this.adminAccessService = adminAccessService;
         this.adminKakaoIds = adminKakaoIds;
         this.adminGoogleIds = adminGoogleIds;
     }
@@ -66,7 +69,12 @@ public class AuthService {
                         profile.email(),
                         profile.profileImageUrl())));
 
-        user.updateAdmin(isConfiguredAdmin(profile));
+        // 설정(ADMIN_*_IDS)에 있는 계정은 항상 운영자. 그 밖의 권한은 어드민 화면에서 부여·회수하므로
+        // 로그인할 때 덮어쓰지 않는다(예전처럼 매번 끄면 화면에서 부여한 권한이 사라진다).
+        if (isConfiguredAdmin(profile)) {
+            user.updateAdmin(true);
+        }
+        adminAccessService.applyInviteOnLogin(user);
         user.recordLogin(java.time.Instant.now());
         return tokenService.issue(user);
     }

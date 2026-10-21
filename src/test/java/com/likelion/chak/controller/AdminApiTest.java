@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import java.util.UUID;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -72,5 +73,26 @@ class AdminApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.displayName").value("탈퇴한 사용자"))
                 .andExpect(jsonPath("$.user.deletedAt").isNotEmpty());
+    }
+
+    @Test
+    void adminAccessEndpointsRequireAdminAndWork() throws Exception {
+        UserAccount member = user(false);
+        mockMvc.perform(as(member, get("/api/admin/admins"))).andExpect(status().isForbidden());
+        mockMvc.perform(as(member, post("/api/admin/admins").contentType("application/json")
+                .content("{\"email\":\"a@b.com\"}"))).andExpect(status().isForbidden());
+
+        UserAccount admin = user(true);
+        String email = "invite-" + UUID.randomUUID() + "@example.com";
+        mockMvc.perform(as(admin, post("/api/admin/admins").contentType("application/json")
+                        .content("{\"email\":\"" + email.toUpperCase() + "\"}")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.invites[?(@.email=='" + email + "')]").isNotEmpty());
+        mockMvc.perform(as(admin, post("/api/admin/admins").contentType("application/json")
+                .content("{\"email\":\"bad\"}"))).andExpect(status().isBadRequest());
+        mockMvc.perform(as(admin, delete("/api/admin/admins/users/" + admin.getId())))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ADMIN_SELF_REVOKE"));
+        mockMvc.perform(as(admin, delete("/api/admin/admins/users/" + member.getId())))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_AN_ADMIN"));
     }
 }
