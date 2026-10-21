@@ -22,6 +22,14 @@ public interface PersonalMessageDeliveryRepository extends JpaRepository<Persona
 
     long countByDeskAndMessageStatusNot(PersonalDesk desk, MessageStatus status);
 
+    /** 응원을 남긴 서로 다른 사람 수(회원과 비회원을 각각 한 명으로 센다). */
+    @Query("""
+            select count(distinct coalesce(concat('u', d.message.authorUser.id), concat('g', d.message.authorGuest.id)))
+            from PersonalMessageDelivery d
+            where d.desk = :desk and d.message.status <> :deleted
+            """)
+    long countDistinctAuthors(@Param("desk") PersonalDesk desk, @Param("deleted") MessageStatus deleted);
+
     /** 공개 편지 목록. 책상 주인이 숨긴 작성자의 편지는 제외한다. */
     @EntityGraph(attributePaths = {"message", "message.authorUser"})
     @Query("""
