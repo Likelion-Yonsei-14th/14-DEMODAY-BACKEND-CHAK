@@ -20,6 +20,8 @@ import java.util.Optional;
 
 public interface PersonalMessageDeliveryRepository extends JpaRepository<PersonalMessageDelivery, Long> {
 
+    long countByDeskAndMessageStatusNot(PersonalDesk desk, MessageStatus status);
+
     /** 공개 편지 목록. 책상 주인이 숨긴 작성자의 편지는 제외한다. */
     @EntityGraph(attributePaths = {"message", "message.authorUser"})
     @Query("""

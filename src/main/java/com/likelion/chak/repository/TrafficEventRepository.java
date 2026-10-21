@@ -22,10 +22,10 @@ public interface TrafficEventRepository extends JpaRepository<TrafficEvent, Long
     @Query(value = """
             INSERT INTO traffic_events (
                 event_id, user_id, guest_id, event_type, session_id, path, referrer,
-                resource_type, resource_key, metadata_payload, created_at
+                resource_type, resource_key, metadata_payload, country, region, created_at
             ) VALUES (
                 :eventId, :userId, :guestId, :eventType, :sessionId, :path, :referrer,
-                :resourceType, :resourceKey, :metadataPayload, CURRENT_TIMESTAMP(6)
+                :resourceType, :resourceKey, :metadataPayload, :country, :region, CURRENT_TIMESTAMP(6)
             ) ON DUPLICATE KEY UPDATE id = id
             """, nativeQuery = true)
     int insertOrKeepExisting(
@@ -38,7 +38,18 @@ public interface TrafficEventRepository extends JpaRepository<TrafficEvent, Long
             @Param("referrer") String referrer,
             @Param("resourceType") String resourceType,
             @Param("resourceKey") String resourceKey,
-            @Param("metadataPayload") String metadataPayload);
+            @Param("metadataPayload") String metadataPayload,
+            @Param("country") String country,
+            @Param("region") String region);
+
+    /** 기간 안의 페이지 조회(접속자 통계용). 행: 시각, 회원 id, 비회원 id, 국가, 시·도. */
+    @Query("""
+            select event.createdAt, event.user.id, event.guest.id, event.country, event.region
+            from TrafficEvent event
+            where event.eventType = com.likelion.chak.domain.TrafficEventType.PAGE_VIEW
+              and event.createdAt >= :from and event.createdAt < :to
+            """)
+    List<Object[]> findPageViewsBetween(@Param("from") Instant from, @Param("to") Instant to);
 
     @Query("""
             select event.eventType, count(event)

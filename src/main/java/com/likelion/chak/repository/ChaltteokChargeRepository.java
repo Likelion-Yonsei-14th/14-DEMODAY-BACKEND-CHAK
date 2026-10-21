@@ -16,6 +16,12 @@ public interface ChaltteokChargeRepository extends JpaRepository<ChaltteokCharge
 
     Optional<ChaltteokCharge> findByOrderId(String orderId);
 
+    /** 기간 안에 승인된 충전. 행: 승인 시각, 금액. */
+    @Query("select charge.confirmedAt, charge.amount from ChaltteokCharge charge "
+            + "where charge.status = com.likelion.chak.domain.ChargeStatus.DONE "
+            + "and charge.confirmedAt >= :from and charge.confirmedAt < :to")
+    java.util.List<Object[]> findDoneBetween(@Param("from") Instant from, @Param("to") Instant to);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ChaltteokCharge> findForUpdateByOrderId(String orderId);
 

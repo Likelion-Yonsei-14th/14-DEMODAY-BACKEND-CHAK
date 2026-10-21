@@ -20,6 +20,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -50,11 +51,13 @@ public class PublicAnalyticsController {
     public ResponseEntity<EventRecordedResponse> record(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @CookieValue(name = "${chak.guest-cookie.name}", required = false) String guestKey,
+            @RequestHeader(name = "X-Vercel-IP-Country", required = false) String country,
+            @RequestHeader(name = "X-Vercel-IP-Country-Region", required = false) String region,
             @Valid @RequestBody TrafficEventRequest request) {
         UserAccount user = principal == null ? null : authService.getUser(principal.userId());
         GuestSession guestSession = user == null ? guestIdentityService.resolveOrCreate(guestKey) : null;
         GuestIdentity guest = guestSession == null ? null : guestSession.getGuestIdentity();
-        EventRecordedResponse response = analyticsService.record(user, guest, request);
+        EventRecordedResponse response = analyticsService.record(user, guest, request, AnalyticsService.Geo.fromHeaders(country, region));
 
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.CREATED);
         if (guestSession != null && guestSession.isCreated()) {

@@ -68,6 +68,13 @@ public class TrafficEvent {
     @Column(columnDefinition = "LONGTEXT")
     private String metadataPayload;
 
+    /** 접속 국가(ISO 2자리)와 시·도 코드. IP는 저장하지 않는다. */
+    @Column(length = 2)
+    private String country;
+
+    @Column(length = 40)
+    private String region;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -81,7 +88,9 @@ public class TrafficEvent {
             String referrer,
             String resourceType,
             String resourceKey,
-            String metadataPayload) {
+            String metadataPayload,
+            String country,
+            String region) {
         this.eventId = eventId;
         this.user = user;
         this.guest = guest;
@@ -92,6 +101,8 @@ public class TrafficEvent {
         this.resourceType = resourceType;
         this.resourceKey = resourceKey;
         this.metadataPayload = metadataPayload;
+        this.country = country;
+        this.region = region;
     }
 
     public static TrafficEvent create(
@@ -107,7 +118,7 @@ public class TrafficEvent {
             String metadataPayload) {
         return new TrafficEvent(
                 eventId, user, guest, eventType, sessionId, path, referrer,
-                resourceType, resourceKey, metadataPayload);
+                resourceType, resourceKey, metadataPayload, null, null);
     }
 
     @PrePersist

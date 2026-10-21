@@ -67,6 +67,7 @@ public class AuthService {
                         profile.profileImageUrl())));
 
         user.updateAdmin(isConfiguredAdmin(profile));
+        user.recordLogin(java.time.Instant.now());
         return tokenService.issue(user);
     }
 

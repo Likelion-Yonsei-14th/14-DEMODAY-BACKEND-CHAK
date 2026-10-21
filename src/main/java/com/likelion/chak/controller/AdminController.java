@@ -6,6 +6,13 @@ import com.likelion.chak.dto.AdvertisementResponse;
 import com.likelion.chak.dto.AdvertisementMetricsResponse;
 import com.likelion.chak.dto.AnalyticsSummaryResponse;
 import com.likelion.chak.dto.MessageResponseBody;
+import com.likelion.chak.dto.AdminDtos.DailyStatsResponse;
+import com.likelion.chak.dto.AdminDtos.RegionStatsResponse;
+import com.likelion.chak.dto.AdminDtos.UserDetail;
+import com.likelion.chak.dto.AdminDtos.UserSummary;
+import com.likelion.chak.dto.AdminDtos.WithdrawRequest;
+import com.likelion.chak.service.AdminStatsService;
+import com.likelion.chak.service.AdminUserService;
 import com.likelion.chak.service.AdvertisementService;
 import com.likelion.chak.service.AnalyticsService;
 import com.likelion.chak.service.AuthService;
@@ -43,6 +50,8 @@ public class AdminController {
     private final AdvertisementService advertisementService;
     private final AnalyticsService analyticsService;
     private final ReportAdminService reportAdminService;
+    private final AdminUserService adminUserService;
+    private final AdminStatsService adminStatsService;
 
     @GetMapping("/ads")
     public ResponseEntity<List<AdvertisementResponse>> getAdvertisements(
@@ -113,5 +122,52 @@ public class AdminController {
             @Valid @RequestBody ReportActionRequest request) {
         authService.getAdmin(principal.userId());
         return ResponseEntity.ok(reportAdminService.act(reportId, request.action()));
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<SliceResponse<UserSummary>> getUsers(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(name = "query", required = false) String query,
+            @RequestParam(name = "state", defaultValue = "ACTIVE") String state,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adminUserService.list(query, state, page, size));
+    }
+
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<UserDetail> getUser(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("userId") Long userId) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adminUserService.detail(userId));
+    }
+
+    @PostMapping("/users/{userId}/withdraw")
+    public ResponseEntity<UserDetail> withdrawUser(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("userId") Long userId,
+            @RequestBody(required = false) WithdrawRequest request) {
+        authService.getAdmin(principal.userId());
+        boolean confirm = request != null && request.confirmForfeitBalance();
+        return ResponseEntity.ok(adminUserService.withdraw(principal.userId(), userId, confirm));
+    }
+
+    @GetMapping("/stats/daily")
+    public ResponseEntity<DailyStatsResponse> getDailyStats(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(name = "from", required = false) java.time.LocalDate from,
+            @RequestParam(name = "to", required = false) java.time.LocalDate to) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adminStatsService.daily(from, to));
+    }
+
+    @GetMapping("/stats/regions")
+    public ResponseEntity<RegionStatsResponse> getRegionStats(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(name = "from", required = false) java.time.LocalDate from,
+            @RequestParam(name = "to", required = false) java.time.LocalDate to) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adminStatsService.regions(from, to));
     }
 }

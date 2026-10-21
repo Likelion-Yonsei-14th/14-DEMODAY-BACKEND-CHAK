@@ -799,6 +799,38 @@ PATCH /api/admin/reports/{reportId}
 }
 ```
 
+### 8.2 회원 관리
+
+모두 운영자(Bearer) 전용입니다.
+
+```text
+GET  /api/admin/users?query=&state=ACTIVE|DELETED|ALL&page=0&size=20
+GET  /api/admin/users/{userId}
+POST /api/admin/users/{userId}/withdraw      { "confirmForfeitBalance": false }
+```
+
+- 목록: `query`는 이름·이메일·로그인 식별자의 일부 또는 회원 번호입니다. 기본은 탈퇴하지 않은 회원(`ACTIVE`), 가입일 최신순입니다. 행: `id, provider, displayName, email, profileImageUrl, admin, createdAt, lastLoginAt, deletedAt`.
+- 상세: 위 정보에 책상(`deskId`, `deskClosed`), 받은 응원 수, 보낸 응원 수, 찰떡 잔액, 최근 관리자 작업 기록(`history`)이 붙습니다.
+- **탈퇴 처리**는 행을 지우지 않고 **개인정보를 지우는 익명화**입니다(응원·결제 장부의 연결을 보존하기 위함).
+  - 이름은 `탈퇴한 사용자`, 이메일·프로필 사진은 삭제, 로그인 식별자는 `deleted:{id}`로 바뀝니다. 같은 카카오·구글 계정으로 다시 로그인하면 **새 회원**이 만들어집니다.
+  - 로그인 유지(리프레시) 토큰은 모두 삭제됩니다. 이미 발급된 액세스 토큰은 만료(30분)까지 유효합니다.
+  - 그 회원이 보낸 응원은 **남고** 작성자 표시만 `탈퇴한 사용자`로 바뀝니다. 그 회원의 책상은 닫히고(새 응원 불가) 이름이 지워지며, 받은 응원은 남습니다.
+  - 찰떡이 남아 있으면 `409 BALANCE_REMAINING`이고, `confirmForfeitBalance: true`로 소멸에 동의해야 진행합니다. 결제·충전 장부는 법정 보존을 위해 남습니다.
+  - 운영자 계정과 본인은 탈퇴 처리할 수 없습니다(`409 ADMIN_ACCOUNT_PROTECTED`). 이미 처리한 회원을 다시 호출하면 그대로 성공합니다.
+  - 처리 내용은 `admin_audit_logs`에 기록됩니다.
+
+### 8.3 통계
+
+```text
+GET /api/admin/stats/daily?from=2026-10-01&to=2026-10-14     날짜별(한국 시간)
+GET /api/admin/stats/regions?from=…&to=…                     접속 지역(시·도)
+```
+
+- 날짜는 `yyyy-MM-dd`이고 **한국 시간(Asia/Seoul)** 기준입니다. 생략하면 일별은 최근 14일, 지역은 최근 30일이며 최대 92일까지입니다(초과·역순은 `400`).
+- 일별: `date, visitors(회원+비회원 고유 접속자), memberVisitors, guestVisitors, pageViews, signups, desksCreated, messagesCreated, chargeAmount(승인된 충전 금액)`. 활동이 없는 날도 0으로 포함하고, 응답 앞부분에 전체 `totalUsers`(탈퇴 제외)·`totalDesks`·`totalMessages`가 옵니다.
+- 지역: `country, region, regionName(서울·부산 등), visitors, pageViews`를 조회수 순으로, 위치를 알 수 없는 조회는 `unknownPageViews`로 따로 셉니다.
+- **접속자·지역은 프론트가 `POST /api/public/analytics/events`로 `PAGE_VIEW`를 보낼 때만 집계됩니다.** 위치는 호스팅(Vercel)이 요청에 붙여 주는 `X-Vercel-IP-Country`, `X-Vercel-IP-Country-Region` 값(국가·시도 코드)만 저장하며 **IP는 저장하지 않습니다.**
+
 ## 9. 보낸 응원·반응·신고 (작성자·방문자)
 
 모두 `/api/public/**`이며 로그인은 선택입니다. 회원은 Bearer, 비회원은 `chak_guest_id` 쿠키(`credentials: "include"`)로 본인을 식별합니다. 신원을 확인할 수 없으면 `401 IDENTITY_REQUIRED`(조회 API는 빈 결과)입니다.
@@ -982,6 +1014,8 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 | 409 | `MESSAGE_NOT_READ` | 읽지 않은 편지를 바구니로 이동 시도 |
 | 409 | `MESSAGE_NOT_DELETABLE` | 이미 읽혔거나 공개 편지가 아니어서 작성자가 삭제할 수 없음 |
 | 401 | `IDENTITY_REQUIRED` | 작성자를 확인할 수 없음(로그인 또는 비회원 쿠키 필요) |
+| 409 | `BALANCE_REMAINING` | 남은 찰떡이 있는 회원의 탈퇴 처리(소멸 동의 필요) |
+| 409 | `ADMIN_ACCOUNT_PROTECTED` | 운영자 계정·본인 탈퇴 처리 시도 |
 | 409 | `REPLY_ALREADY_EXISTS` | 이미 답장한 편지가 포함됨 |
 | 400 | `INVALID_REPLY` | 답장 대상(내 책상의 열린 편지가 아님) 또는 내용 오류 |
 | 404 | `BLOCK_NOT_FOUND` | 숨긴 작성자를 찾을 수 없음 |

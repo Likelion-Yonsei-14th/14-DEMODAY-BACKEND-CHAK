@@ -31,7 +31,7 @@ public class UserAccount {
     private AuthProvider provider;
 
     /** 제공자가 발급한 불변 식별자(카카오 회원번호, 구글 sub). (provider, providerUserId)가 유일하다. */
-    @Column(nullable = false, updatable = false, length = 100)
+    @Column(nullable = false, length = 100)
     private String providerUserId;
 
     @Column(nullable = false, length = 50)
@@ -45,6 +45,11 @@ public class UserAccount {
 
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean admin;
+
+    private Instant lastLoginAt;
+
+    /** 탈퇴 처리한 시각. 값이 있으면 개인정보를 지운 익명 계정이다(행은 장부·응원의 FK 때문에 남긴다). */
+    private Instant deletedAt;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -90,6 +95,29 @@ public class UserAccount {
         this.displayName = displayName;
         this.email = email;
         this.profileImageUrl = profileImageUrl;
+    }
+
+    public static final String WITHDRAWN_NAME = "탈퇴한 사용자";
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public void recordLogin(Instant at) {
+        this.lastLoginAt = at;
+    }
+
+    /**
+     * 개인정보를 지우고 익명 계정으로 바꾼다. 로그인 식별자도 바꿔서 같은 카카오·구글 계정으로 다시 가입하면
+     * 새 계정이 만들어지고, 이 행은 응원·결제 장부의 연결만 유지한다.
+     */
+    public void anonymize(Instant at) {
+        this.displayName = WITHDRAWN_NAME;
+        this.email = null;
+        this.profileImageUrl = null;
+        this.admin = false;
+        this.providerUserId = "deleted:" + id;
+        this.deletedAt = at;
     }
 
     public void updateAdmin(boolean admin) {
