@@ -91,6 +91,17 @@ curl localhost/api/public/health
 
 수동 롤백: 이전 이미지로 `docker tag <이전 이미지 ID> ghcr.io/likelion-yonsei-14th/14-demoday-backend-chak:latest` 후 `sudo /opt/chak/run.sh`. (GitHub에서 문제 커밋을 되돌려 머지하는 쪽이 더 안전하다.)
 
+### DB 비밀번호 자동 교체 (2026-10-22 장애)
+
+RDS의 관리형 비밀번호(`rds!db-...` 시크릿, `ManageMasterUserPassword`)는 **7일마다 자동으로 바뀐다.** 서버 실행 스크립트(`run.sh`)는 컨테이너를 시작할 때 한 번만 비밀번호를 환경변수로 넘기므로, 교체 뒤에는 낡은 비밀번호로 새 DB 연결이 전부 실패해 `CannotCreateTransactionException`이 쏟아졌다(RDS는 정상, 연결 수 0). 또 이미지가 같으면 `update.sh`가 컨테이너를 다시 띄우지 않아서 같은 코드를 다시 배포해도 복구되지 않았다.
+
+지금은 앱이 직접 처리한다.
+- 시작할 때 `chak.db-secret-id`(기본값은 현재 RDS 시크릿 이름, `DB_SECRET_ID`로 재정의)의 최신 계정 정보를 읽어 환경변수의 `DB_PASSWORD`보다 우선해 쓴다. 읽지 못하면 환경변수 값으로 계속한다.
+- 실행 중에는 5분마다 시크릿을 확인해, 비밀번호가 바뀌었으면 연결 풀을 새 값으로 갱신한다(재시작 불필요).
+- DB를 새로 만들어 시크릿 이름이 바뀌면 `DB_SECRET_ID`(또는 `chak/prod/app` 시크릿의 같은 키)를 새 이름으로 맞춘다.
+
+**증상으로 확인하기:** 헬스체크는 `UP`인데 DB를 쓰는 API가 멈추고 RDS 연결 수가 0이면 이 경우를 먼저 의심한다. RDS → 시크릿의 "마지막 교체 날짜"가 장애 시작 시각 직전인지 본다. 이전 코드에서는 수동으로 `sudo /opt/chak/run.sh`를 실행하면 복구된다.
+
 ## 비용(시드니 리전, 대략)
 EC2 t3.small ≈ $19, RDS db.t4g.micro + 20GB ≈ $19, 공인 IPv4 ≈ $4, 시크릿 2개 ≈ $1, CloudFront·S3는 소량이면 거의 무료 → **월 약 $40~45**. 계정의 무료 플랜 크레딧이 소진되면 청구된다.
 
