@@ -233,7 +233,9 @@ https://accounts.google.com/o/oauth2/v2/auth
 
 ### 4.0 서버 상태 확인
 
-`GET /api/public/health` → `200 OK` `{ "status": "UP" }`. 인증 불필요이며 프론트 연결 확인과 배포 헬스체크에 사용합니다.
+`GET /api/public/health` → `200 OK` `{ "status": "UP" }`. 인증 불필요이며 프로세스가 떠 있는지만 봅니다(DB와 무관). 프론트 연결 확인과 서버의 자동 교체·롤백 판단에 사용합니다.
+
+`GET /api/public/health/db` → DB에서 `SELECT 1`이 4초 안에 되면 `200 {"status":"UP","db":"UP"}`, 연결이 안 되거나 멈추면 `503 {"status":"DOWN","db":"DOWN"}`(원인은 노출하지 않고 서버 로그에만 남깁니다). **외부 감시(UptimeRobot)는 이쪽을 확인합니다.** 서버는 살아 있는데 DB 연결이 막힌 장애를 잡기 위한 것입니다.
 
 ### 4.1 공개 책상 조회
 

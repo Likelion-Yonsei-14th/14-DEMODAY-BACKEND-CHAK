@@ -14,4 +14,5 @@ WORKDIR /app
 COPY --from=build /src/build/libs/chak-0.0.1-SNAPSHOT.jar app.jar
 USER chak
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+# 메모리가 바닥나면 멈춘 채 버티지 않고 종료해서 도커가 바로 다시 띄우게 한다.
+ENTRYPOINT ["java", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/app.jar"]
