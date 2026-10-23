@@ -87,4 +87,29 @@ class SecretsManagerEnvironmentPostProcessorTest {
                     "org.springframework.boot.EnvironmentPostProcessor=" + SecretsManagerEnvironmentPostProcessor.class.getName());
         }
     }
+
+    @Test
+    void dbCredentialsFromTheRdsSecretOverrideTheStaleEnvironmentValues() {
+        MockEnvironment env = new MockEnvironment()
+                .withProperty("spring.datasource.username", "admin")
+                .withProperty("spring.datasource.password", "old-password");
+        processor.applyDbCredentials(env, "rds!db-x", id -> "{\"username\":\"admin\",\"password\":\"rotated-password\"}");
+
+        assertThat(env.getProperty("spring.datasource.password")).isEqualTo("rotated-password");
+        assertThat(env.getPropertySources().get(SecretsManagerEnvironmentPostProcessor.DB_SOURCE_NAME)).isNotNull();
+    }
+
+    @Test
+    void dbCredentialsKeepTheEnvironmentWhenTheSecretCannotBeRead() {
+        MockEnvironment env = new MockEnvironment().withProperty("spring.datasource.password", "from-env");
+        processor.applyDbCredentials(env, "rds!db-x", id -> {
+            throw new IllegalStateException("AccessDenied");
+        });
+        processor.applyDbCredentials(env, "rds!db-x", id -> "{\"username\":\"admin\"}");
+        processor.applyDbCredentials(env, "", id -> {
+            throw new AssertionError("must not fetch when no secret id is configured");
+        });
+
+        assertThat(env.getProperty("spring.datasource.password")).isEqualTo("from-env");
+    }
 }

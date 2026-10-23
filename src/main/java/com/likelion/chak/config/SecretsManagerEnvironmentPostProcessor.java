@@ -35,6 +35,7 @@ import java.util.function.Function;
 public class SecretsManagerEnvironmentPostProcessor implements EnvironmentPostProcessor {
 
     static final String SOURCE_NAME = "chak-secrets-manager";
+    static final String DB_SOURCE_NAME = "chak-db-credentials";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Log log;
@@ -52,6 +53,30 @@ public class SecretsManagerEnvironmentPostProcessor implements EnvironmentPostPr
         String region = firstNonBlank(
                 environment.getProperty("AWS_REGION"), environment.getProperty("storage.s3.region"), "ap-southeast-2");
         apply(environment, secretId, id -> fetch(id, region));
+        applyDbCredentials(environment, environment.getProperty("chak.db-secret-id", ""), id -> fetch(id, region));
+    }
+
+    /**
+     * DB 계정 정보를 RDS 관리 시크릿에서 직접 읽어 환경변수보다 우선하게 한다.
+     * 이 시크릿은 7일마다 자동으로 비밀번호가 바뀌는데, 서버 실행 스크립트가 시작할 때 한 번만 넘겨 준 비밀번호는
+     * 교체 뒤 낡은 값이 되어 DB 연결이 전부 실패한다(2026-10-22 장애). 시작할 때마다 최신 값을 읽으면 재시작만으로 복구된다.
+     * 읽지 못하면 기존 환경변수 값으로 계속한다.
+     */
+    void applyDbCredentials(ConfigurableEnvironment environment, String dbSecretId, Function<String, String> fetcher) {
+        if (dbSecretId == null || dbSecretId.isBlank()) {
+            return;
+        }
+        try {
+            DbCredentials credentials = DbCredentials.parse(fetcher.apply(dbSecretId));
+            Map<String, Object> values = new LinkedHashMap<>();
+            values.put("spring.datasource.username", credentials.username());
+            values.put("spring.datasource.password", credentials.password());
+            environment.getPropertySources().addFirst(new MapPropertySource(DB_SOURCE_NAME, values));
+            log.info("Using DB credentials from Secrets Manager (values are never logged)");
+        } catch (RuntimeException e) {
+            log.warn("Could not load DB credentials from Secrets Manager, keeping the environment values: "
+                    + e.getClass().getSimpleName());
+        }
     }
 
     /** 시크릿을 가져오는 방법을 바꿔 끼울 수 있게 분리(테스트용). */
@@ -81,7 +106,7 @@ public class SecretsManagerEnvironmentPostProcessor implements EnvironmentPostPr
         return values;
     }
 
-    private static String fetch(String secretId, String region) {
+    static String fetch(String secretId, String region) {
         try (SecretsManagerClient client = SecretsManagerClient.builder()
                 .region(Region.of(region))
                 .credentialsProvider(DefaultCredentialsProvider.builder().build())
