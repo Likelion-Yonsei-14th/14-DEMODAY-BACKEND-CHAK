@@ -64,7 +64,8 @@ prod 프로필의 앱은 시작할 때 Secrets Manager의 `chak/prod/app`(`CHAK_
 - 로컬·테스트에서는 `chak.secrets.id`가 비어 있어 동작하지 않는다.
 
 ### 2-3. 서버 생존 감시(업타임)
-외부 업타임 서비스가 `https://www.chak.live/api/public/health`를 5분마다 확인하고, 실패하면 디스코드로 알린다(서버가 통째로 꺼진 경우는 앱이 스스로 알릴 수 없다).
+외부 업타임 서비스가 `https://www.chak.live/api/public/health/db`(DB 연결까지 확인, 안 되면 503)를 5분마다 확인하고, 실패하면 디스코드로 알린다(서버가 통째로 꺼진 경우는 앱이 스스로 알릴 수 없다).
+- 서버 교체용 `/api/public/health`(DB 무관)가 아니라 **`/health/db`를 감시**해야 DB 장애를 잡는다.
 - UptimeRobot(무료)이나 Better Stack에서 HTTP 모니터를 만들고 URL과 확인 주기(5분)를 넣은 뒤, 알림 채널로 디스코드를 연결한다.
 
 ### 3. GHCR 이미지 공개
@@ -101,6 +102,12 @@ RDS의 관리형 비밀번호(`rds!db-...` 시크릿, `ManageMasterUserPassword`
 - DB를 새로 만들어 시크릿 이름이 바뀌면 `DB_SECRET_ID`(또는 `chak/prod/app` 시크릿의 같은 키)를 새 이름으로 맞춘다.
 
 **증상으로 확인하기:** 헬스체크는 `UP`인데 DB를 쓰는 API가 멈추고 RDS 연결 수가 0이면 이 경우를 먼저 의심한다. RDS → 시크릿의 "마지막 교체 날짜"가 장애 시작 시각 직전인지 본다. 이전 코드에서는 수동으로 `sudo /opt/chak/run.sh`를 실행하면 복구된다.
+
+### 연결 풀 · 기록 정리
+
+- **DB 연결 풀**(운영 프로필): 연결을 못 얻으면 5초 만에 실패(기본값 30초면 DB가 막혔을 때 요청 스레드가 쌓여 서버 전체가 느려진다), 연결 최대 수명 25분·5분마다 생존 확인, 접속 3초·응답 20초 제한.
+- **오래된 기록 정리**: 매일 새벽 4:30(한국 시간)에 만료·폐기된 지 7일 지난 `refresh_tokens`와 180일 지난 `traffic_events`를 2,000건씩 나눠 지운다(`chak.retention.*`로 조정, `chak.retention.enabled=false`로 끔). 고정된 DB 디스크가 차서 멈추는 일을 막기 위한 것이다.
+- **메모리 부족**: 컨테이너의 JVM이 `-XX:+ExitOnOutOfMemoryError`로 실행돼, 멈춘 채 버티지 않고 종료하면 도커가 바로 다시 띄운다.
 
 ## 비용(시드니 리전, 대략)
 EC2 t3.small ≈ $19, RDS db.t4g.micro + 20GB ≈ $19, 공인 IPv4 ≈ $4, 시크릿 2개 ≈ $1, CloudFront·S3는 소량이면 거의 무료 → **월 약 $40~45**. 계정의 무료 플랜 크레딧이 소진되면 청구된다.
