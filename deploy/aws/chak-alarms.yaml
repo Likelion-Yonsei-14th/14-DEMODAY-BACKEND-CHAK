@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  CHAK infrastructure alarms (email). A separate stack on purpose: it only reads the database and the
+  server by id, so creating, changing or deleting it can never touch the running server or database.
+  (Updating the main chak-prod stack would replace the EC2 instance because its AMI is the latest one.)
+
+Parameters:
+  DbInstanceId:
+    Type: String
+    Description: RDS instance identifier (chak-prod stack output DatabaseEndpoint, the part before the first dot).
+  ServerInstanceId:
+    Type: String
+    Description: EC2 instance id of the server (chak-prod stack output ServerInstanceId).
+  AlarmEmail:
+    Type: String
+    Description: Email that gets the alarms. AWS sends a confirmation mail that must be accepted once.
+
+Resources:
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlarmEmail
+
+  # The app keeps idle connections open, so zero connections for 15 minutes means it cannot reach the
+  # database at all (the 2026-10-22 outage: server up, health check fine, every request failing).
+  DbNoConnectionsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The app has no database connections (stale password, network, or the app is down).
+      Namespace: AWS/RDS
+      MetricName: DatabaseConnections
+      Dimensions: [{Name: DBInstanceIdentifier, Value: !Ref DbInstanceId}]
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  DbLowStorageAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Less than 3 GB of database disk left.
+      Namespace: AWS/RDS
+      MetricName: FreeStorageSpace
+      Dimensions: [{Name: DBInstanceIdentifier, Value: !Ref DbInstanceId}]
+      Statistic: Minimum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3221225472
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  DbCpuCreditsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The burstable database is running out of CPU credits and will slow down.
+      Namespace: AWS/RDS
+      MetricName: CPUCreditBalance
+      Dimensions: [{Name: DBInstanceIdentifier, Value: !Ref DbInstanceId}]
+      Statistic: Minimum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 20
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  ServerStatusAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The server instance failed its status checks.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed
+      Dimensions: [{Name: InstanceId, Value: !Ref ServerInstanceId}]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlarmTopic]
