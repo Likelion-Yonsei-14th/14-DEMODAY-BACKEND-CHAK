@@ -4,10 +4,10 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
 import java.util.function.Function;
@@ -17,8 +17,7 @@ import java.util.function.Function;
  * 값이 바뀌었으면 풀의 비밀번호를 갱신하고 기존 연결은 사용이 끝나는 대로 새 연결로 교체한다.
  * 시크릿을 읽지 못하면 아무것도 바꾸지 않고 다음 주기에 다시 시도한다.
  */
-@Configuration
-@EnableScheduling
+@Component
 @ConditionalOnExpression("!'${chak.db-secret-id:}'.isBlank()")
 public class DbCredentialRefresher {
 
@@ -28,6 +27,7 @@ public class DbCredentialRefresher {
     private final String secretId;
     private final Function<String, String> fetcher;
 
+    @Autowired
     public DbCredentialRefresher(
             DataSource dataSource,
             @Value("${chak.db-secret-id}") String secretId,
