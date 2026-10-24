@@ -9,6 +9,7 @@ import com.likelion.chak.dto.TrafficEventRequest;
 import com.likelion.chak.service.AnalyticsService;
 import com.likelion.chak.service.AuthService;
 import com.likelion.chak.service.GuestIdentityService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,9 +56,10 @@ public class PublicAnalyticsController {
             @RequestHeader(name = "X-Chak-Geo-Region", required = false) String chakRegion,
             @RequestHeader(name = "X-Vercel-IP-Country", required = false) String vercelCountry,
             @RequestHeader(name = "X-Vercel-IP-Country-Region", required = false) String vercelRegion,
-            @Valid @RequestBody TrafficEventRequest request) {
+            @Valid @RequestBody TrafficEventRequest request,
+            HttpServletRequest http) {
         UserAccount user = principal == null ? null : authService.getUser(principal.userId());
-        GuestSession guestSession = user == null ? guestIdentityService.resolveOrCreate(guestKey) : null;
+        GuestSession guestSession = user == null ? guestIdentityService.resolveOrCreateLimited(guestKey, ClientIp.of(http)) : null;
         GuestIdentity guest = guestSession == null ? null : guestSession.getGuestIdentity();
         EventRecordedResponse response = analyticsService.record(user, guest, request, AnalyticsService.Geo.fromHeaders(
                 firstNonBlank(chakCountry, vercelCountry), firstNonBlank(chakRegion, vercelRegion)));

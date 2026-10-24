@@ -27,18 +27,10 @@ public class PromotionController {
 
     @PostMapping("/inquiries")
     public ResponseEntity<InquiryReceived> submit(@Valid @RequestBody InquiryRequest request, HttpServletRequest http) {
-        if (!rateLimiter.tryAcquire(clientIp(http))) {
+        if (!rateLimiter.tryAcquire(ClientIp.of(http))) {
             throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
         }
         inquiryService.submit(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(new InquiryReceived(true));
-    }
-
-    private static String clientIp(HttpServletRequest http) {
-        String forwarded = http.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return http.getRemoteAddr();
     }
 }

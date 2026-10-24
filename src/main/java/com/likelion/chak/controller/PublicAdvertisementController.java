@@ -11,6 +11,7 @@ import com.likelion.chak.dto.GuestSession;
 import com.likelion.chak.service.AdvertisementService;
 import com.likelion.chak.service.AuthService;
 import com.likelion.chak.service.GuestIdentityService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,9 +64,10 @@ public class PublicAdvertisementController {
             @PathVariable("advertisementId") Long advertisementId,
             @AuthenticationPrincipal AuthenticatedUser principal,
             @CookieValue(name = "${chak.guest-cookie.name}", required = false) String guestKey,
-            @Valid @RequestBody AdvertisementEventRequest request) {
+            @Valid @RequestBody AdvertisementEventRequest request,
+            HttpServletRequest http) {
         UserAccount user = principal == null ? null : authService.getUser(principal.userId());
-        GuestSession guestSession = user == null ? guestIdentityService.resolveOrCreate(guestKey) : null;
+        GuestSession guestSession = user == null ? guestIdentityService.resolveOrCreateLimited(guestKey, ClientIp.of(http)) : null;
         GuestIdentity guest = guestSession == null ? null : guestSession.getGuestIdentity();
         EventRecordedResponse response = advertisementService.recordEvent(
                 advertisementId, user, guest, request);
