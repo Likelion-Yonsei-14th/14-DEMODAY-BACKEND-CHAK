@@ -6,6 +6,10 @@ import com.likelion.chak.config.AuthenticatedUser;
 import com.likelion.chak.domain.UserAccount;
 import com.likelion.chak.dto.MinigameDtos.Leaderboard;
 import com.likelion.chak.dto.MinigameDtos.RoundCreated;
+import com.likelion.chak.dto.MinigameDtos.SneakyPhoneBoard;
+import com.likelion.chak.dto.MinigameDtos.SneakyPhoneResult;
+import com.likelion.chak.dto.MinigameDtos.SneakyPhoneRoundCreated;
+import com.likelion.chak.dto.MinigameDtos.SneakyPhoneSubmit;
 import com.likelion.chak.dto.MinigameDtos.StudyTypeStats;
 import com.likelion.chak.dto.MinigameDtos.StudyTypeSubmit;
 import com.likelion.chak.dto.MinigameDtos.SubmitRequest;
@@ -14,6 +18,7 @@ import com.likelion.chak.exception.CustomException;
 import com.likelion.chak.exception.ErrorCode;
 import com.likelion.chak.service.AuthService;
 import com.likelion.chak.service.GuessGodService;
+import com.likelion.chak.service.SneakyPhoneService;
 import com.likelion.chak.service.StudyTypeService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -38,6 +43,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class MinigameController {
 
     private final GuessGodService guessGodService;
+    private final SneakyPhoneService sneakyPhoneService;
     private final StudyTypeService studyTypeService;
     private final AuthService authService;
     private final MinigameRateLimiter rateLimiter;
@@ -65,6 +71,31 @@ public class MinigameController {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
         return ResponseEntity.ok(guessGodService.leaderboard(period, viewer(principal)));
+    }
+
+    @PostMapping("/sneaky-phone/rounds")
+    public ResponseEntity<SneakyPhoneRoundCreated> createSneakyPhoneRound(
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest http) {
+        limit(Action.SNEAKY_PHONE_ROUND, principal, http);
+        return ResponseEntity.status(HttpStatus.CREATED).body(sneakyPhoneService.createRound());
+    }
+
+    @PostMapping("/sneaky-phone/rounds/{roundId}/submit")
+    public ResponseEntity<SneakyPhoneResult> submitSneakyPhone(
+            @PathVariable String roundId,
+            @Valid @RequestBody SneakyPhoneSubmit request,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(sneakyPhoneService.submit(roundId, request, viewer(principal)));
+    }
+
+    @GetMapping("/sneaky-phone/leaderboard")
+    public ResponseEntity<SneakyPhoneBoard> sneakyPhoneLeaderboard(
+            @RequestParam(defaultValue = "daily") String period,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        if (!"daily".equals(period) && !"overall".equals(period)) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        return ResponseEntity.ok(sneakyPhoneService.leaderboard(period, viewer(principal)));
     }
 
     @PostMapping("/study-type/results")

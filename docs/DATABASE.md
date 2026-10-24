@@ -302,7 +302,7 @@ UNIQUE `(advertisement_id, event_type, session_id)` — 재시도 중복 방지.
 
 ## 미니게임 (V13)
 
-- `minigame_rounds`: `public_id`(판 번호, UUID·고유), `game`(`GUESS_GOD`), `answer_key`(문항별 정답을 이어 붙인 숫자 문자열, 제출 전에는 API로 나가지 않음), `user_id`(제출한 회원, 비회원이면 비어 있음), `score`, `created_at`, `submitted_at`. 인덱스 `(game, submitted_at)`, `(user_id, game, score)`, `created_at`.
+- `minigame_rounds`: `public_id`(판 번호, UUID·고유), `game`(`GUESS_GOD`, `SNEAKY_PHONE`), `answer_key`(찍신은 문항별 정답을 이어 붙인 숫자 문자열이며 제출 전에는 API로 나가지 않음, 폰 게임은 빈 문자열), `user_id`(제출한 회원, 비회원이면 비어 있음), `score`(폰 게임은 보너스를 더한 최종 점수), `created_at`, `submitted_at`. 인덱스 `(game, submitted_at)`, `(user_id, game, score)`, `created_at`.
   랭킹은 이 표에서 회원별 최고 점수를 묶어 계산합니다. 정리 배치가 제출하지 않고 2일 지난 판과 비회원이 제출하고 30일 지난 판을 지우고, 회원의 기록은 남깁니다.
 - `minigame_profiles`: `user_id`(PK), `nickname`, `updated_at`. 회원 탈퇴 처리 때 지웁니다.
 - `study_type_results`: `code`(`PSA` 등 8개), `user_id`(고유, 비회원은 비어 있음), `created_at`. 회원은 한 줄을 덮어씁니다.

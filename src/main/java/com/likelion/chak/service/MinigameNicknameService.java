@@ -23,7 +23,7 @@ public class MinigameNicknameService {
     public NicknameResponse get(Long userId) {
         UserAccount user = authService.getUser(userId);
         String nickname = repository.findById(userId).map(MinigameProfile::getNickname).orElse(null);
-        return new NicknameResponse(nickname, GuessGodService.defaultNickname(user));
+        return new NicknameResponse(nickname, MinigameRankingService.defaultNickname(user));
     }
 
     @Transactional
@@ -42,6 +42,6 @@ public class MinigameNicknameService {
         } else {
             profile.rename(nickname);
         }
-        return new NicknameResponse(nickname, GuessGodService.defaultNickname(user));
+        return new NicknameResponse(nickname, MinigameRankingService.defaultNickname(user));
     }
 }
