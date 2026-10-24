@@ -56,6 +56,7 @@ public class AdminController {
     private final AdminUserService adminUserService;
     private final AdminStatsService adminStatsService;
     private final AdminAccessService adminAccessService;
+    private final com.likelion.chak.service.PromotionInquiryService promotionInquiryService;
 
     @GetMapping("/ads")
     public ResponseEntity<List<AdvertisementResponse>> getAdvertisements(
@@ -203,5 +204,24 @@ public class AdminController {
             @PathVariable("inviteId") Long inviteId) {
         authService.getAdmin(principal.userId());
         return ResponseEntity.ok(adminAccessService.cancelInvite(principal.userId(), inviteId));
+    }
+
+    @GetMapping("/promotion-inquiries")
+    public ResponseEntity<SliceResponse<com.likelion.chak.dto.PromotionDtos.InquiryResponse>> getPromotionInquiries(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(name = "status", required = false) com.likelion.chak.domain.PromotionInquiry.Status status,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(promotionInquiryService.list(status, page, size));
+    }
+
+    @PatchMapping("/promotion-inquiries/{inquiryId}")
+    public ResponseEntity<com.likelion.chak.dto.PromotionDtos.InquiryResponse> changePromotionInquiryStatus(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("inquiryId") Long inquiryId,
+            @Valid @RequestBody com.likelion.chak.dto.PromotionDtos.InquiryStatusRequest request) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(promotionInquiryService.changeStatus(principal.userId(), inquiryId, request.status()));
     }
 }

@@ -78,4 +78,18 @@ class DataRetentionServiceTest {
         assertThat(deleted[1]).isEqualTo(total);
         assertThat(count("traffic_events")).isEqualTo(eventsBefore);
     }
+
+    @Test
+    void removesPromotionInquiriesOlderThanAYear() {
+        long before = count("promotion_inquiries");
+        jdbc.update("INSERT INTO promotion_inquiries (company, contact_name, email, interest, status, created_at) VALUES (?,?,?,?,?,?)",
+                "오래된회사", "담당", "old@example.com", "PACKAGE", "NEW", daysAgo(400));
+        jdbc.update("INSERT INTO promotion_inquiries (company, contact_name, email, interest, status, created_at) VALUES (?,?,?,?,?,?)",
+                "최근회사", "담당", "new@example.com", "PACKAGE", "NEW", daysAgo(30));
+
+        int[] deleted = retention.purge();
+
+        assertThat(deleted[2]).isEqualTo(1);
+        assertThat(count("promotion_inquiries")).isEqualTo(before + 1);
+    }
 }

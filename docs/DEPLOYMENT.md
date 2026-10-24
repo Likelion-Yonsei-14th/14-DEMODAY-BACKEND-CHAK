@@ -106,7 +106,7 @@ RDS의 관리형 비밀번호(`rds!db-...` 시크릿, `ManageMasterUserPassword`
 ### 연결 풀 · 기록 정리
 
 - **DB 연결 풀**(운영 프로필): 연결을 못 얻으면 5초 만에 실패(기본값 30초면 DB가 막혔을 때 요청 스레드가 쌓여 서버 전체가 느려진다), 연결 최대 수명 25분·5분마다 생존 확인, 접속 3초·응답 20초 제한.
-- **오래된 기록 정리**: 매일 새벽 4:30(한국 시간)에 만료·폐기된 지 7일 지난 `refresh_tokens`와 180일 지난 `traffic_events`를 2,000건씩 나눠 지운다(`chak.retention.*`로 조정, `chak.retention.enabled=false`로 끔). 고정된 DB 디스크가 차서 멈추는 일을 막기 위한 것이다.
+- **오래된 기록 정리**: 매일 새벽 4:30(한국 시간)에 만료·폐기된 지 7일 지난 `refresh_tokens`와 180일 지난 `traffic_events`, 1년 지난 `promotion_inquiries`(광고 상담 신청, 담당자 연락처 포함)를 2,000건씩 나눠 지운다(`chak.retention.*`로 조정, `chak.retention.enabled=false`로 끔). 고정된 DB 디스크가 차서 멈추는 일을 막기 위한 것이다.
 - **메모리 부족**: 컨테이너의 JVM이 `-XX:+ExitOnOutOfMemoryError`로 실행돼, 멈춘 채 버티지 않고 종료하면 도커가 바로 다시 띄운다.
 
 ## 비용(시드니 리전, 대략)
