@@ -74,6 +74,9 @@ prod 프로필의 앱은 시작할 때 Secrets Manager의 `chak/prod/app`(`CHAK_
 ### 4. 프론트 연결
 프론트(Vercel)는 `/api/*` 요청을 CloudFront 주소로 넘기는 rewrite를 쓴다. 브라우저에서는 같은 사이트라 쿠키(`SameSite=Lax`)와 CORS 문제가 없다. 카카오 개발자 콘솔의 Redirect URI에 `https://<프론트 도메인>/auth/kakao/callback`, 구글 클라우드 콘솔의 승인된 리디렉션 URI에 `https://<프론트 도메인>/auth/google/callback`을 등록한다.
 
+## 배포 전에 CI가 확인하는 것
+`main`에 머지되면 ① 단위·통합 테스트(`test`), ② 운영 프로필 기동 확인(`boot-check`: MySQL에서 마이그레이션까지 적용해 실제로 뜨는지)을 통과해야 이미지가 GHCR에 올라간다. 둘 중 하나라도 실패하면 이미지는 올라가지 않아 서버가 새 이미지를 받지 않는다. 풀 리퀘스트에서도 같은 두 확인이 돈다. 자세한 내용은 `docs/RELIABILITY.md`의 "운영 기동 확인".
+
 ## 매일 쓰는 흐름
 `main`에 머지 → GitHub Actions(`.github/workflows/docker-publish.yml`)가 테스트·빌드·push(약 4~6분) → 서버가 1분 안에 감지해 교체. 문서(`*.md`, `docs/`)만 바뀐 커밋은 배포하지 않는다.
 
