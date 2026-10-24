@@ -92,4 +92,25 @@ class DataRetentionServiceTest {
         assertThat(deleted[2]).isEqualTo(1);
         assertThat(count("promotion_inquiries")).isEqualTo(before + 1);
     }
+
+    @Test
+    void removesAbandonedAndGuestMinigameRoundsButKeepsMemberScores() {
+        long u = user();
+        long before = count("minigame_rounds");
+        round(null, null, daysAgo(5));                       // 제출 안 하고 버려짐 → 삭제
+        round(null, null, daysAgo(0));                       // 방금 만든 판 → 유지
+        round(7, null, daysAgo(40));                         // 비회원이 제출한 오래된 판 → 삭제
+        round(7, null, daysAgo(3));                          // 비회원이 제출한 최근 판 → 유지
+        round(9, u, daysAgo(200));                           // 회원 기록 → 유지
+
+        int[] deleted = retention.purge();
+
+        assertThat(deleted[3]).isEqualTo(2);
+        assertThat(count("minigame_rounds")).isEqualTo(before + 3);
+    }
+
+    private void round(Integer score, Long userId, java.sql.Timestamp createdAt) {
+        jdbc.update("INSERT INTO minigame_rounds (public_id, game, answer_key, user_id, score, created_at, submitted_at) VALUES (?,?,?,?,?,?,?)",
+                UUID.randomUUID().toString(), "GUESS_GOD", "1234512345", userId, score, createdAt, score == null ? null : createdAt);
+    }
 }
