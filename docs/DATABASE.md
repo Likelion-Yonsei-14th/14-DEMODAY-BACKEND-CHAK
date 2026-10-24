@@ -16,6 +16,7 @@
 | V7 | chaltteok_wallets, chaltteok_charges, chaltteok_ledger |
 | V8 | users: `kakao_id` → `provider` + `provider_user_id`, 유일 제약을 (provider, provider_user_id)로 변경 (기존 회원은 모두 KAKAO) |
 | V12 | promotion_inquiries(광고 상담 신청, 1년 뒤 삭제) |
+| V13 | minigame_rounds(찍신 한 판), minigame_profiles(랭킹 닉네임), study_type_results(유형 테스트 결과) |
 | V11 | personal_desks `claim_token`(넘겨받기 링크, UNIQUE)·`claimed_at`·`deleted_at`(삭제 표시) |
 | V10 | admin_invites(이메일로 운영자 권한 초대, 최초 운영자 시드) |
 | V9 | users `last_login_at`·`deleted_at`(탈퇴 익명화), traffic_events `country`·`region`(접속 지역, IP 미저장), admin_audit_logs |
@@ -298,3 +299,10 @@ UNIQUE `(advertisement_id, event_type, session_id)` — 재시도 중복 방지.
 
 - `promotion_inquiries`: `company`, `contact_name`, `email`(소문자), `phone`·`category`·`interest`·`message`(선택), `status`(`NEW`/`CONTACTED`/`CLOSED`), `created_at`, `handled_at`. 인덱스 `(status, created_at)`, `(email, created_at)`(24시간 중복 확인).
 - 담당자 연락처가 들어 있어 `DataRetentionService`가 매일 새벽 1년이 지난 행을 지웁니다.
+
+## 미니게임 (V13)
+
+- `minigame_rounds`: `public_id`(판 번호, UUID·고유), `game`(`GUESS_GOD`), `answer_key`(문항별 정답을 이어 붙인 숫자 문자열, 제출 전에는 API로 나가지 않음), `user_id`(제출한 회원, 비회원이면 비어 있음), `score`, `created_at`, `submitted_at`. 인덱스 `(game, submitted_at)`, `(user_id, game, score)`, `created_at`.
+  랭킹은 이 표에서 회원별 최고 점수를 묶어 계산합니다. 정리 배치가 제출하지 않고 2일 지난 판과 비회원이 제출하고 30일 지난 판을 지우고, 회원의 기록은 남깁니다.
+- `minigame_profiles`: `user_id`(PK), `nickname`, `updated_at`. 회원 탈퇴 처리 때 지웁니다.
+- `study_type_results`: `code`(`PSA` 등 8개), `user_id`(고유, 비회원은 비어 있음), `created_at`. 회원은 한 줄을 덮어씁니다.
