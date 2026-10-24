@@ -21,6 +21,8 @@
 | 13 | 마이그레이션이 시작할 때 자동 실행되고, 이미지를 되돌려도 스키마는 안 돌아감 | 중간 | 주의 (아래) |
 | 14 | 라이브 서버의 `run.sh`가 템플릿과 다름(손으로 고침) | 중간 | 주의 |
 | 15 | 프론트(Vercel)가 단일 의존이고 미들웨어 실수가 전체를 막을 수 있음 | 중간 | 문서화 |
+| 16 | 운영 프로필로 앱이 뜨는지 배포 전에 확인하지 않음(2026-10-23 장애: 테스트에서는 안 만들어지는 빈이 운영에서만 시작 직후 종료) | 치명 | **해결** (CI `boot-check`, 아래) |
+| 17 | 풀 리퀘스트에는 테스트가 돌지 않고 머지 뒤에야 돎 | 중간 | **해결** (PR에서도 테스트와 `boot-check` 실행) |
 
 ## 열려 있는 것
 
@@ -52,3 +54,16 @@
 
 - `/api/public/health/db`가 200이고, DB에 접속할 수 없을 때는 503이 나온다(자동 테스트 포함).
 - 경보: RDS 연결 수가 15분 연속 0이면(앱은 유휴 연결을 계속 유지하므로 정상일 때는 0이 되지 않는다) 메일이 온다.
+
+## 운영 기동 확인 (`boot-check`)
+
+테스트는 H2와 별도 설정 파일로 돌아서 두 가지를 못 잡는다. ① 운영 설정에서만 만들어지는 빈(2026-10-23 장애의 원인), ② MySQL에서만 터지는 마이그레이션(H2에서는 Flyway를 끄고 돈다).
+그래서 CI에 `boot-check` 작업을 두었다. MySQL 8.0 서비스를 띄우고, 만들어진 jar를 **prod 프로필로 실행**해(실제 마이그레이션 전부 적용) `/api/public/health/db`가 200을 줄 때까지 기다린다. 실패하면 마지막 로그를 출력하고, 이미지 게시(`publish`)는 이 작업이 통과해야 진행된다. 풀 리퀘스트에서도 같은 확인이 돌아 머지 전에 알 수 있다.
+
+로컬에서 직접 돌리려면(MySQL이 있어야 함):
+```bash
+./gradlew bootJar -x test
+DB_URL='jdbc:mysql://127.0.0.1:3306/chak?serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true&useSSL=false' \
+DB_USERNAME=root DB_PASSWORD=... scripts/prod-boot-check.sh
+```
+`DbCredentialRefresher`의 `@Autowired`를 일부러 빼면 이 확인이 `No default constructor found`로 실패하는 것을 확인했다.
