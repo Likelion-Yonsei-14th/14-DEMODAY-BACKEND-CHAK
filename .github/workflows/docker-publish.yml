@@ -1,10 +1,15 @@
 name: build-and-publish
 
-# main에 커밋(머지)될 때마다 테스트 후 도커 이미지를 GHCR에 올린다.
+# main에 커밋(머지)될 때마다 테스트와 운영 기동 확인 후 도커 이미지를 GHCR에 올린다.
 # 서버(EC2)가 1분마다 새 이미지를 확인해 자동으로 교체하므로 AWS 자격증명은 필요 없다.
+# 풀 리퀘스트에서는 테스트와 운영 기동 확인만 돌리고 이미지는 올리지 않는다(머지 전에 깨진 것을 알 수 있게).
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
@@ -27,8 +32,42 @@ jobs:
           cache: gradle
       - run: ./gradlew --no-daemon test
 
+  # 운영과 같은 조건(prod 프로필, 실제 MySQL과 마이그레이션, 만들어진 jar)으로 앱이 실제로 뜨는지 확인한다.
+  # 테스트는 H2와 별도 설정으로 돌아서, 운영에서만 만들어지는 빈이나 MySQL에서만 터지는 마이그레이션을 못 잡는다.
+  boot-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_DATABASE: chak
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - run: ./gradlew --no-daemon bootJar -x test
+      - name: Boot the app with the prod profile
+        env:
+          DB_URL: jdbc:mysql://127.0.0.1:3306/chak?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
+          DB_USERNAME: root
+          DB_PASSWORD: ci-root-password
+        run: scripts/prod-boot-check.sh
+
   publish:
-    needs: test
+    needs: [test, boot-check]
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
