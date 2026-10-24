@@ -798,6 +798,32 @@ S3 버킷은 프론트 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허
 
 `daily`는 한국 시간 0시부터입니다. 닉네임을 정하지 않은 회원은 이름 첫 글자만 `홍**`처럼 보입니다. 탈퇴한 회원은 랭킹에서 빠집니다.
 
+**선생님 몰래 폰 하기**
+
+게임은 브라우저에서 돌아가므로 결과를 완전히 믿을 수는 없습니다. 서버는 **간단한 검사**만 합니다: 판을 서버가 발급해 한 번만 제출하게 하고, 점수가 폰을 든 시간으로 낼 수 있는 최대값(규칙상 끊김 없이 들었을 때)을 넘지 않는지, 판을 만든 뒤 게임 시간이 실제로 지났는지 봅니다. 랭킹은 로그인 회원만 오릅니다.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| POST | `/api/public/minigames/sneaky-phone/rounds` | 게임을 **시작할 때** 판 만들기. 접속자당 시간당 100판 |
+| POST | `/api/public/minigames/sneaky-phone/rounds/{roundId}/submit` | 게임이 끝났을 때 결과 제출 |
+| GET | `/api/public/minigames/sneaky-phone/leaderboard?period=daily\|overall` | 상위 20명 + 내 순위 |
+
+```json
+// POST .../rounds → 201
+{ "roundId": "…uuid…", "gameMs": 30000, "expiresAt": "…" }
+
+// POST .../submit  요청 (프런트의 SneakyPhoneResult에서 status·baseScore·endedAt·totalPhoneMs만 보내면 됩니다. 시간은 밀리초)
+{ "status": "survived", "baseScore": 6000, "endedAt": 30000, "totalPhoneMs": 25000 }
+// → 200  (보너스 500점과 최종 점수는 서버가 계산)
+{ "finalScore": 6500, "baseScore": 6000, "bonus": 500, "ranked": true,
+  "rank": { "daily": 3, "overall": 12, "bestScoreToday": 6500, "bestScoreOverall": 6500 } }   // 비회원이면 ranked=false, rank=null
+
+// GET .../leaderboard → 찍신 랭킹과 같은 모양에서 distribution·totalRounds만 없음
+{ "period": "daily", "entries": [{ "rank": 1, "nickname": "찍신왕", "score": 8100, "me": false }], "me": { "rank": 3, "score": 6500 } }
+```
+
+`status`는 `caught`(들킴) 또는 `survived`(30초 생존)입니다. 검사에 걸리면 `400 INVALID_MINIGAME_RESULT`이고 판은 그대로 남아 올바른 값으로 다시 낼 수 있습니다. 판은 **게임을 시작하는 순간** 만들어야 합니다(끝난 뒤에 만들면 게임 시간이 지나지 않은 것으로 보여 거절됩니다). 최고 점수가 아닌 판도 모두 제출해도 됩니다. 랭킹에는 회원별 최고 점수만 올라갑니다.
+
 **나의 수험생 유형은?**
 
 | 메서드 | 경로 | 설명 |
@@ -1173,6 +1199,7 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 | 404 | `NOT_FOUND` | 존재하지 않는 경로 |
 | 404 | `MINIGAME_ROUND_NOT_FOUND` | 없거나 24시간이 지난 게임 판 |
 | 409 | `MINIGAME_ROUND_ALREADY_SUBMITTED` | 이미 제출한 판 |
+| 400 | `INVALID_MINIGAME_RESULT` | 폰 게임 결과가 규칙·시간 검사에 맞지 않음 |
 | 400 | `INVALID_MINIGAME_ANSWERS` | 답 개수가 문항 수와 다르거나 1~5가 아님 |
 | 400 | `INVALID_NICKNAME` | 닉네임 형식 오류 |
 | 400 | `NICKNAME_NOT_ALLOWED` | 금칙어가 들어 있는 닉네임 |
