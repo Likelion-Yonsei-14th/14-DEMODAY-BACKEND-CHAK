@@ -20,6 +20,7 @@ public enum ErrorCode {
     CLAIM_NOT_AVAILABLE(HttpStatus.NOT_FOUND, "CLAIM_NOT_AVAILABLE", "이미 사용했거나 없는 책상 링크입니다."),
     CLAIM_CONFIRMATION_REQUIRED(HttpStatus.BAD_REQUEST, "CLAIM_CONFIRMATION_REQUIRED", "책상의 주인 본인인지 확인이 필요합니다."),
     TOO_MANY_FRIEND_DESKS(HttpStatus.CONFLICT, "TOO_MANY_FRIEND_DESKS", "아직 전달하지 않은 친구 책상이 너무 많습니다."),
+    INQUIRY_NOT_FOUND(HttpStatus.NOT_FOUND, "INQUIRY_NOT_FOUND", "상담 신청을 찾을 수 없습니다."),
     INVALID_DESK_SETTINGS(HttpStatus.BAD_REQUEST, "INVALID_DESK_SETTINGS", "책상 공개 시각 설정이 올바르지 않습니다."),
     DESK_CLOSED(HttpStatus.CONFLICT, "DESK_CLOSED", "이 책상은 새로운 응원을 받고 있지 않습니다."),
     MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "MESSAGE_NOT_FOUND", "편지를 찾을 수 없습니다."),

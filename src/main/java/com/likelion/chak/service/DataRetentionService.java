@@ -17,6 +17,7 @@ import java.sql.Timestamp;
  * <ul>
  *   <li>refresh_tokens: 만료됐거나 폐기된 지 7일이 지난 토큰(로그인 갱신 때마다 한 줄씩 늘어난다)</li>
  *   <li>traffic_events: 오래된 접속 기록(어드민 통계는 최근 기간만 본다)</li>
+ *   <li>promotion_inquiries: 1년이 지난 광고 상담 신청(담당자 연락처가 들어 있는 개인정보)</li>
  * </ul>
  * 한 번에 많이 지우면 DB가 오래 잠기므로 작은 묶음으로 나눠 지우고, 한 번 실행에 지우는 양에 상한을 둔다.
  */
@@ -31,23 +32,26 @@ public class DataRetentionService {
     private final Clock clock;
     private final int refreshTokenDays;
     private final int trafficEventDays;
+    private final int inquiryDays;
 
     @Autowired
     public DataRetentionService(
             JdbcTemplate jdbc,
             @Value("${chak.retention.refresh-token-days:7}") int refreshTokenDays,
-            @Value("${chak.retention.traffic-event-days:180}") int trafficEventDays) {
-        this(jdbc, Clock.systemUTC(), refreshTokenDays, trafficEventDays);
+            @Value("${chak.retention.traffic-event-days:180}") int trafficEventDays,
+            @Value("${chak.retention.promotion-inquiry-days:365}") int inquiryDays) {
+        this(jdbc, Clock.systemUTC(), refreshTokenDays, trafficEventDays, inquiryDays);
     }
 
-    DataRetentionService(JdbcTemplate jdbc, Clock clock, int refreshTokenDays, int trafficEventDays) {
+    DataRetentionService(JdbcTemplate jdbc, Clock clock, int refreshTokenDays, int trafficEventDays, int inquiryDays) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.refreshTokenDays = refreshTokenDays;
         this.trafficEventDays = trafficEventDays;
+        this.inquiryDays = inquiryDays;
     }
 
-    /** 지운 줄 수(refresh_tokens, traffic_events)를 돌려준다. */
+    /** 지운 줄 수(refresh_tokens, traffic_events, promotion_inquiries)를 돌려준다. */
     public int[] purge() {
         Timestamp tokenCutoff = cutoff(refreshTokenDays);
         int tokens = deleteInBatches("""
@@ -60,10 +64,15 @@ public class DataRetentionService {
                   SELECT id FROM (
                     SELECT id FROM traffic_events WHERE created_at < ? LIMIT %d
                   ) doomed)""".formatted(BATCH_SIZE), cutoff(trafficEventDays));
-        if (tokens > 0 || events > 0) {
-            log.info("Data retention: deleted {} refresh tokens, {} traffic events", tokens, events);
+        int inquiries = deleteInBatches("""
+                DELETE FROM promotion_inquiries WHERE id IN (
+                  SELECT id FROM (
+                    SELECT id FROM promotion_inquiries WHERE created_at < ? LIMIT %d
+                  ) doomed)""".formatted(BATCH_SIZE), cutoff(inquiryDays));
+        if (tokens > 0 || events > 0 || inquiries > 0) {
+            log.info("Data retention: deleted {} refresh tokens, {} traffic events, {} promotion inquiries", tokens, events, inquiries);
         }
-        return new int[]{tokens, events};
+        return new int[]{tokens, events, inquiries};
     }
 
     private int deleteInBatches(String sql, Object... args) {
