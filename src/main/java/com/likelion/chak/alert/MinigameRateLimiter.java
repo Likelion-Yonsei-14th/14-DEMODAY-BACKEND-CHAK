@@ -22,6 +22,8 @@ public class MinigameRateLimiter {
     public enum Action {
         /** 찍신 판 만들기: 시간당 60판. 맞힐 확률이 1천만 분의 1이라 반복 시도로 랭킹을 올리기 어렵다. */
         GUESS_GOD_ROUND(60, 3_600_000L),
+        /** 한 판이 30초라 사람이 시간당 낼 수 있는 판 수보다 넉넉하게 100판. */
+        SNEAKY_PHONE_ROUND(100, 3_600_000L),
         STUDY_TYPE_RESULT(20, 600_000L);
 
         final int limit;

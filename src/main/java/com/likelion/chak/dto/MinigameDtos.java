@@ -1,5 +1,9 @@
 package com.likelion.chak.dto;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -49,6 +53,26 @@ public final class MinigameDtos {
     }
 
     public record StudyTypeSubmit(@NotBlank @Pattern(regexp = "^[PL][SF][AN]$") String code) {
+    }
+
+    public record SneakyPhoneRoundCreated(String roundId, int gameMs, Instant expiresAt) {
+    }
+
+    /**
+     * 게임이 끝났을 때 클라이언트가 가진 결과. 시간은 밀리초, 점수는 보너스를 뺀 기본 점수다.
+     * 보너스와 최종 점수는 서버가 계산하므로 보내지 않아도 된다(보내도 무시한다).
+     */
+    public record SneakyPhoneSubmit(
+            @NotNull @Pattern(regexp = "^(caught|survived)$") String status,
+            @NotNull @Min(0) @Max(20_000) Integer baseScore,
+            @NotNull @DecimalMin("0") @DecimalMax("40000") Double endedAt,
+            @NotNull @DecimalMin("0") @DecimalMax("40000") Double totalPhoneMs) {
+    }
+
+    public record SneakyPhoneResult(int finalScore, int baseScore, int bonus, boolean ranked, Rank rank) {
+    }
+
+    public record SneakyPhoneBoard(String period, List<LeaderboardEntry> entries, MyStanding me) {
     }
 
     public record StudyTypeShare(String code, long count, double percent) {
