@@ -370,6 +370,22 @@ await fetch(`${API_URL}/api/public/desks/${supporterToken}/messages`, {
 });
 ```
 
+### 4.4 광고 상담 신청
+
+`POST /api/public/promotion/inquiries` — 브랜드 담당자가 `/promotion/apply`에서 남기는 상담 신청. 로그인 없이 호출합니다.
+
+```json
+{ "company": "착커피", "contactName": "김담당", "email": "kim@example.com",
+  "phone": "010-0000-0000", "message": "배너만 가능한지 궁금해요", "consent": true, "website": "" }
+```
+
+- 필수는 `company`, `contactName`, `email`, `consent: true`입니다. `phone`(숫자·`+-() `만, 30자), `category`, `interest`(`PACKAGE`/`BANNER`/`OTHER`), `message`(2,000자)는 선택입니다.
+- 응답은 `201 { "received": true }`입니다.
+- **`website`는 사람에게 보이지 않는 칸**입니다. 값이 있으면 자동 입력으로 보고 저장하지 않고 같은 `201`로 답합니다. 같은 회사·이메일의 24시간 안 재전송도 저장하지 않고 `201`로 답합니다.
+- 접속자(IP 해시)당 1시간 5건, 전체 1시간 60건을 넘으면 `429 TOO_MANY_EVENTS`입니다.
+- 저장하면 운영자 디스코드에 "새 광고 상담 신청"(회사명·업종·관심 구성만, 연락처는 싣지 않음)이 갑니다.
+- 담당자 연락처가 들어 있어 **접수 1년 뒤 자동 삭제**합니다(`chak.retention.promotion-inquiry-days`).
+
 ## 5. 내 책상 및 받은 편지 API
 
 아래 API는 모두 Bearer 인증이 필요합니다. 개인 책상은 계정당 하나만 만들 수 있습니다.
@@ -807,6 +823,16 @@ GET   /api/admin/analytics/summary?from={ISO_INSTANT}&to={ISO_INSTANT}
 건수가 0인 이벤트 종류는 맵에 포함되지 않을 수 있습니다. 광고 요청은 `endsAt`이 `startsAt`보다 늦어야 하고 URL은 `http(s)`여야 합니다(`INVALID_ADVERTISEMENT`).
 
 `DELETE`는 이력을 유지한 채 광고를 비활성화합니다. 광고별 지표는 해당 광고의 노출·시청·클릭 건수를 반환합니다. 전체 분석 요약은 트래픽과 광고 이벤트 종류별 건수를 반환합니다. 조회 범위는 최대 366일이며 기간을 생략하면 최근 7일입니다.
+
+### 8.0 상담 신청 관리
+
+```text
+GET   /api/admin/promotion-inquiries?status=NEW&page=0&size=20   (status 생략 시 전체, 최신순)
+PATCH /api/admin/promotion-inquiries/{id}   { "status": "CONTACTED" }   NEW | CONTACTED | CLOSED
+```
+
+- 응답은 `SliceResponse<{ id, company, contactName, email, phone, category, interest, message, status, createdAt, handledAt }>`입니다. 없는 id는 `404 INQUIRY_NOT_FOUND`입니다.
+- 상태 변경은 `admin_audit_logs`(`PROMOTION_INQUIRY_STATUS`)에 남습니다.
 
 ### 8.1 신고 관리
 

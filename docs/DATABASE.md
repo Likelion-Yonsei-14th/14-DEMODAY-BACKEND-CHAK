@@ -15,6 +15,7 @@
 | V6 | payment_orders, payment_order_items, ad_unlocks |
 | V7 | chaltteok_wallets, chaltteok_charges, chaltteok_ledger |
 | V8 | users: `kakao_id` → `provider` + `provider_user_id`, 유일 제약을 (provider, provider_user_id)로 변경 (기존 회원은 모두 KAKAO) |
+| V12 | promotion_inquiries(광고 상담 신청, 1년 뒤 삭제) |
 | V11 | personal_desks `claim_token`(넘겨받기 링크, UNIQUE)·`claimed_at`·`deleted_at`(삭제 표시) |
 | V10 | admin_invites(이메일로 운영자 권한 초대, 최초 운영자 시드) |
 | V9 | users `last_login_at`·`deleted_at`(탈퇴 익명화), traffic_events `country`·`region`(접속 지역, IP 미저장), admin_audit_logs |
@@ -292,3 +293,8 @@ UNIQUE `(advertisement_id, event_type, session_id)` — 재시도 중복 방지.
 
 - `admin_invites`: `email`(소문자, UNIQUE), `created_by`(NULL이면 최초 설정), `created_at`, `consumed_at`, `consumed_user_id`. 구글이 확인한 같은 이메일로 로그인하면 `users.admin`을 켜고 `consumed_*`를 채웁니다. 적용된 초대는 목록에서 숨기고 행은 기록으로 남깁니다.
 - 마이그레이션이 `mj0324@yonsei.ac.kr`을 첫 운영자로 심습니다.
+
+## 광고 상담 신청 (V12)
+
+- `promotion_inquiries`: `company`, `contact_name`, `email`(소문자), `phone`·`category`·`interest`·`message`(선택), `status`(`NEW`/`CONTACTED`/`CLOSED`), `created_at`, `handled_at`. 인덱스 `(status, created_at)`, `(email, created_at)`(24시간 중복 확인).
+- 담당자 연락처가 들어 있어 `DataRetentionService`가 매일 새벽 1년이 지난 행을 지웁니다.
