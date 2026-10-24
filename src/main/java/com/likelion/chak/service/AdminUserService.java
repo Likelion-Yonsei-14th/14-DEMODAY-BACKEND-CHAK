@@ -14,6 +14,7 @@ import com.likelion.chak.exception.ErrorCode;
 import com.likelion.chak.repository.AdminAuditLogRepository;
 import com.likelion.chak.repository.ChaltteokWalletRepository;
 import com.likelion.chak.repository.MessageRepository;
+import com.likelion.chak.repository.MinigameProfileRepository;
 import com.likelion.chak.repository.PersonalDeskRepository;
 import com.likelion.chak.repository.PersonalMessageDeliveryRepository;
 import com.likelion.chak.repository.RefreshTokenRepository;
@@ -45,6 +46,7 @@ public class AdminUserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final ChaltteokWalletRepository walletRepository;
     private final AdminAuditLogRepository auditLogRepository;
+    private final MinigameProfileRepository minigameProfileRepository;
 
     @Transactional(readOnly = true)
     public SliceResponse<UserSummary> list(String query, String state, int page, int size) {
@@ -106,6 +108,7 @@ public class AdminUserService {
         Instant now = Instant.now();
         user.anonymize(now);
         refreshTokenRepository.deleteAllByUserId(userId);
+        minigameProfileRepository.deleteById(userId);
         messageRepository.anonymizeAuthor(userId, UserAccount.WITHDRAWN_NAME);
         deskRepository.findForUpdateByOwnerId(userId).ifPresent(PersonalDesk::closeForWithdrawnOwner);
         auditLogRepository.save(new AdminAuditLog(admin, "WITHDRAW_USER", "USER", userId,

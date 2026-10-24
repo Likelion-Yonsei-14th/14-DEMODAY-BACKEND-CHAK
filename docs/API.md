@@ -764,6 +764,62 @@ S3 버킷은 프론트 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허
 - 같은 오류는 5분에 한 번만 알리고, 그 사이 횟수는 다음 알림에 합쳐서 표시합니다. 전체 알림은 분당 20건으로 제한합니다.
 - 서버가 직접 겪는 오류(처리되지 않은 예외, 카카오·구글·토스 연동 같은 5xx 비즈니스 오류)도 같은 채널로 알립니다.
 
+### 7.5 미니게임
+
+미니게임 점수와 통계는 서버가 정합니다. 모두 로그인 없이 호출할 수 있고, `Authorization: Bearer`를 같이 보내면 회원으로 기록됩니다. **랭킹에는 로그인 회원만 오르며**(비회원은 점수와 정답만 받음), 랭킹은 미니게임 화면에서만 보여 줍니다.
+
+**오늘의 찍신은 나야!** (정답은 서버가 정하고 제출 전에는 내려가지 않습니다. 한 판은 한 번만 제출할 수 있고 24시간 안에 내야 합니다.)
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| POST | `/api/public/minigames/guess-god/rounds` | 새 판 만들기. 접속자당 시간당 60판 |
+| POST | `/api/public/minigames/guess-god/rounds/{roundId}/submit` | 답 제출·채점 |
+| GET | `/api/public/minigames/guess-god/leaderboard?period=daily\|overall` | 랭킹 상위 20명 + 내 순위 + 점수 분포 |
+
+```json
+// POST .../rounds → 201
+{ "roundId": "…uuid…", "questionCount": 10, "choiceCount": 5, "expiresAt": "…" }
+
+// POST .../submit  요청: 문항별 고른 번호(1~5), 고르지 않은 문항은 null. 길이는 questionCount와 같아야 합니다.
+{ "answers": [3, 1, null, 5, 2, 2, 4, 1, 3, 5] }
+// → 200
+{ "score": 4, "questionCount": 10, "answerKey": [3,1,4,5,2,1,1,1,2,5],
+  "ranked": true,                                   // 로그인 회원이 낸 경우만 true
+  "rank": { "daily": 12, "overall": 40, "bestScoreToday": 4, "bestScoreOverall": 6 },   // 비회원이면 null
+  "betterThanPercent": 63 }                         // 전체 제출 중 나보다 낮은 점수의 비율
+
+// GET .../leaderboard
+{ "period": "daily",
+  "entries": [{ "rank": 1, "nickname": "찍신왕", "score": 9, "me": false }],   // 동점은 같은 순위, 회원별 최고 점수
+  "me": { "rank": 12, "score": 4 },               // 로그인했고 기간 안에 제출했을 때만, 아니면 null
+  "distribution": [0, 3, 21, …],                  // 길이 11, distribution[i] = i점을 받은 판 수(비회원 포함)
+  "totalRounds": 480 }
+```
+
+`daily`는 한국 시간 0시부터입니다. 닉네임을 정하지 않은 회원은 이름 첫 글자만 `홍**`처럼 보입니다. 탈퇴한 회원은 랭킹에서 빠집니다.
+
+**나의 수험생 유형은?**
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| POST | `/api/public/minigames/study-type/results` | 결과 유형 기록 `{"code":"PSA"}` (8개 코드 `PSA PSN PFA PFN LSA LSN LFA LFN`). 접속자당 10분에 20번 |
+| GET | `/api/public/minigames/study-type/stats` | 유형별 사람 수와 비율 |
+
+```json
+// 두 API 모두 같은 모양 (POST는 201)
+{ "total": 1520, "myCode": "PSA",                  // myCode는 로그인 회원이 한 번이라도 기록했을 때만
+  "distribution": [{ "code": "PSA", "count": 210, "percent": 13.8 }, …8개] }
+```
+
+결과 화면에 들어올 때마다가 아니라 **테스트를 끝낸 순간 한 번만** 기록해 주세요. 회원은 다시 해도 한 줄만 남고 유형이 바뀌며, 비회원은 기록할 때마다 한 줄씩 늘어납니다(참고용 통계입니다).
+
+**랭킹 닉네임** (로그인 필수)
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/api/minigames/me/nickname` | `{ "nickname": null \| "찍신왕", "defaultNickname": "홍**" }` |
+| PUT | `/api/minigames/me/nickname` | `{ "nickname": "찍신왕" }` — 앞뒤 공백을 지운 2~12자, 한글·영문·숫자·밑줄·공백만. 욕설·성적·혐오·자해·운영진 사칭 단어가 들어 있으면 `400 NICKNAME_NOT_ALLOWED`(공백·숫자를 끼워 넣어도 걸러짐) |
+
 ## 8. 운영자 API
 
 Bearer 인증이 필요하며 `users.admin`이 켜진 계정만 접근할 수 있습니다. 권한은 어드민 화면의 운영자 관리(8.4)로 부여·회수하고, 환경변수 `ADMIN_KAKAO_IDS`·`ADMIN_GOOGLE_IDS`에 있는 계정은 로그인할 때 항상 운영자가 됩니다(회수해도 다음 로그인에 복구되므로, 환경변수는 비상용으로만 둡니다).
@@ -1115,6 +1171,11 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 | 502 | `STORAGE_API_ERROR` | Object Storage 통신 오류 |
 | 503 | `STORAGE_NOT_CONFIGURED` | Object Storage 환경변수 미설정 |
 | 404 | `NOT_FOUND` | 존재하지 않는 경로 |
+| 404 | `MINIGAME_ROUND_NOT_FOUND` | 없거나 24시간이 지난 게임 판 |
+| 409 | `MINIGAME_ROUND_ALREADY_SUBMITTED` | 이미 제출한 판 |
+| 400 | `INVALID_MINIGAME_ANSWERS` | 답 개수가 문항 수와 다르거나 1~5가 아님 |
+| 400 | `INVALID_NICKNAME` | 닉네임 형식 오류 |
+| 400 | `NICKNAME_NOT_ALLOWED` | 금칙어가 들어 있는 닉네임 |
 | 405 | `METHOD_NOT_ALLOWED` | 지원하지 않는 HTTP 메서드 |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | `application/json`이 아닌 Content-Type |
 | 500 | `INTERNAL_SERVER_ERROR` | 서버 내부 오류 |
