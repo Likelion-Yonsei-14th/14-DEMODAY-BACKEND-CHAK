@@ -63,7 +63,7 @@ public final class AdminDtos {
     public record RegionStat(String country, String region, String regionName, long visitors, long pageViews) {
     }
 
-    public record RegionStatsResponse(LocalDate from, LocalDate to, List<RegionStat> items, long unknownPageViews) {
+    public record RegionStatsResponse(LocalDate from, LocalDate to, List<RegionStat> items, long unknownPageViews, long overseasPageViews) {
     }
 
     public record AdminInviteEntry(Long id, String email, Instant createdAt, Instant consumedAt, boolean bootstrap) {
