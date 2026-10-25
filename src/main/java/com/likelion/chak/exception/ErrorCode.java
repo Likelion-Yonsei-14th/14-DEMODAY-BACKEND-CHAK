@@ -63,6 +63,8 @@ public enum ErrorCode {
     ADVERTISEMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "ADVERTISEMENT_NOT_FOUND", "광고를 찾을 수 없습니다."),
     INVALID_ADVERTISEMENT(HttpStatus.BAD_REQUEST, "INVALID_ADVERTISEMENT", "광고 정보가 올바르지 않습니다."),
     INVALID_ANALYTICS_EVENT(HttpStatus.BAD_REQUEST, "INVALID_ANALYTICS_EVENT", "분석 이벤트 정보가 올바르지 않습니다."),
+    TOO_MANY_MESSAGES(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_MESSAGES", "응원을 너무 많이 보냈어요. 잠시 후 다시 시도해주세요."),
+    DESK_BUSY(HttpStatus.TOO_MANY_REQUESTS, "DESK_BUSY", "이 책상에 응원이 한꺼번에 몰리고 있어요. 잠시 후 다시 시도해주세요."),
     TOO_MANY_EVENTS(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_EVENTS", "이벤트 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
     MINIGAME_ROUND_NOT_FOUND(HttpStatus.NOT_FOUND, "MINIGAME_ROUND_NOT_FOUND", "없거나 만료된 게임입니다. 새로 시작해주세요."),
     MINIGAME_ROUND_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "MINIGAME_ROUND_ALREADY_SUBMITTED", "이미 제출한 게임입니다."),

@@ -14,7 +14,11 @@ final class ClientIp {
     static String of(HttpServletRequest http) {
         String forwarded = http.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+            String first = forwarded.split(",")[0].trim();
+            // 숫자·점·콜론·16진 문자로 된 주소만 받는다. 엉뚱한 문자열로 제한 키를 마음대로 늘리지 못하게 한다.
+            if (first.length() <= 45 && first.matches("^[0-9A-Fa-f:.]+$")) {
+                return first;
+            }
         }
         return http.getRemoteAddr();
     }
