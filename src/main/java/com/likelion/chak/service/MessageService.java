@@ -42,6 +42,8 @@ public class MessageService {
 
     private static final int CURRENT_SCHEMA_VERSION = 1;
     private static final int MAX_CARD_PAYLOAD_LENGTH = 500_000;
+    /** 비회원은 사진을 붙일 수 없어 글과 스티커만 들어간다. 훨씬 작게 묶어 한 번에 저장되는 양을 줄인다. */
+    private static final int MAX_GUEST_CARD_PAYLOAD_LENGTH = 100_000;
     private static final int MAX_STICKERS_PER_PAGE = 10;
     private static final int MAX_PHOTOS_PER_PAGE = 10;
     private static final Instant MAX_UNLOCK_BOUND = Instant.parse("9999-01-01T00:00:00Z");
@@ -295,6 +297,9 @@ public class MessageService {
         }
 
         validateCard(request.getKind(), request.getCard());
+        if (guest && request.getCard() != null && request.getCard().toString().length() > MAX_GUEST_CARD_PAYLOAD_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_CARD_PAYLOAD);
+        }
         validateDeskObject(request.getObject());
     }
 

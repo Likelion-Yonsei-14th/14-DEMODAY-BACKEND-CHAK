@@ -1,16 +1,20 @@
 package com.likelion.chak.controller;
 
+import com.likelion.chak.alert.PublicWriteLimiter;
 import com.likelion.chak.config.AuthenticatedUser;
 import com.likelion.chak.dto.GuestSession;
 import com.likelion.chak.dto.PaymentDtos.OrderCreateRequest;
 import com.likelion.chak.dto.PaymentDtos.OrderResponse;
 import com.likelion.chak.dto.PaymentDtos.UnlockRequest;
 import com.likelion.chak.dto.PaymentDtos.UnlockResponse;
+import com.likelion.chak.exception.CustomException;
+import com.likelion.chak.exception.ErrorCode;
 import com.likelion.chak.service.CallerIdentity;
 import com.likelion.chak.service.GuestCookieService;
 import com.likelion.chak.service.IdentityService;
 import com.likelion.chak.service.PaymentService;
 import com.likelion.chak.service.UnlockService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -36,12 +40,18 @@ public class PublicPaymentController {
     private final GuestCookieService guestCookieService;
     private final PaymentService paymentService;
     private final UnlockService unlockService;
+    private final PublicWriteLimiter writeLimiter;
 
     @PostMapping("/payments/orders")
     public ResponseEntity<OrderResponse> createOrder(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @CookieValue(name = "${chak.guest-cookie.name}", required = false) String guestKey,
-            @Valid @RequestBody OrderCreateRequest request) {
+            @Valid @RequestBody OrderCreateRequest request,
+            HttpServletRequest http) {
+        String who = principal != null ? "u" + principal.userId() : "ip" + ClientIp.of(http);
+        if (!writeLimiter.tryAcquire(PublicWriteLimiter.Action.ORDER, who)) {
+            throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
+        }
         Writer writer = writer(principal, guestKey);
         OrderResponse response = paymentService.createOrder(writer.identity, request);
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.CREATED);

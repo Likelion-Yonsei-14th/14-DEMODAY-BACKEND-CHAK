@@ -1,5 +1,6 @@
 package com.likelion.chak.controller;
 
+import com.likelion.chak.alert.PublicWriteLimiter;
 import com.likelion.chak.config.AuthenticatedUser;
 import com.likelion.chak.domain.UserAccount;
 import com.likelion.chak.domain.TrafficEventType;
@@ -8,11 +9,14 @@ import com.likelion.chak.dto.GuestSession;
 import com.likelion.chak.dto.MessageResponse;
 import com.likelion.chak.dto.PublicDeskResponse;
 import com.likelion.chak.dto.SliceResponse;
+import com.likelion.chak.exception.CustomException;
+import com.likelion.chak.exception.ErrorCode;
 import com.likelion.chak.service.DeskService;
 import com.likelion.chak.service.AuthService;
 import com.likelion.chak.service.AnalyticsService;
 import com.likelion.chak.service.GuestIdentityService;
 import com.likelion.chak.service.MessageService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -41,6 +45,7 @@ public class PublicDeskController {
     private final AnalyticsService analyticsService;
     private final GuestIdentityService guestIdentityService;
     private final MessageService messageService;
+    private final PublicWriteLimiter writeLimiter;
 
     @Value("${chak.guest-cookie.name}")
     private String guestCookieName;
@@ -93,13 +98,16 @@ public class PublicDeskController {
             @PathVariable("supporterToken") String supporterToken,
             @CookieValue(name = "${chak.guest-cookie.name}", required = false) String guestKey,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
-            @RequestBody GuestMessageCreateRequest request) {
+            @RequestBody GuestMessageCreateRequest request,
+            HttpServletRequest http) {
+        checkMessageLimits(authenticatedUser, guestKey, supporterToken, http);
         if (authenticatedUser != null) {
             UserAccount user = authService.getUser(authenticatedUser.userId());
             MessageResponse response = messageService.createUserMessage(supporterToken, user, request);
             analyticsService.recordSystem(
                     user, null, TrafficEventType.MESSAGE_CREATED,
                     "PERSONAL_DESK", supporterToken, "/public/desks/" + supporterToken + "/messages");
+            recordDeskMessage(supporterToken);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         }
 
@@ -116,6 +124,7 @@ public class PublicDeskController {
                 supporterToken,
                 "/public/desks/" + supporterToken + "/messages");
 
+        recordDeskMessage(supporterToken);
         ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.status(HttpStatus.CREATED);
         if (guestSession.isCreated()) {
             responseBuilder.header(HttpHeaders.SET_COOKIE, createGuestCookie(
@@ -123,6 +132,27 @@ public class PublicDeskController {
         }
 
         return responseBuilder.body(response);
+    }
+
+    /** 같은 접속자가 너무 자주 보내거나, 한 책상에 응원이 쏟아지면 거절한다. 거절된 요청은 책상 상한을 채우지 않는다. */
+    private void checkMessageLimits(AuthenticatedUser user, String guestKey, String supporterToken, HttpServletRequest http) {
+        boolean allowed = user != null
+                ? writeLimiter.tryAcquire(PublicWriteLimiter.Action.USER_MESSAGE, "u" + user.userId())
+                : writeLimiter.tryAcquire(PublicWriteLimiter.Action.GUEST_MESSAGE_IP, ClientIp.of(http))
+                        && (guestKey == null || guestKey.isBlank()
+                                || writeLimiter.tryAcquire(PublicWriteLimiter.Action.GUEST_MESSAGE_ID, guestKey));
+        if (!allowed) {
+            throw new CustomException(ErrorCode.TOO_MANY_MESSAGES);
+        }
+        if (!writeLimiter.allows(PublicWriteLimiter.Action.DESK_MESSAGE_HOUR, supporterToken)
+                || !writeLimiter.allows(PublicWriteLimiter.Action.DESK_MESSAGE_DAY, supporterToken)) {
+            throw new CustomException(ErrorCode.DESK_BUSY);
+        }
+    }
+
+    private void recordDeskMessage(String supporterToken) {
+        writeLimiter.record(PublicWriteLimiter.Action.DESK_MESSAGE_HOUR, supporterToken);
+        writeLimiter.record(PublicWriteLimiter.Action.DESK_MESSAGE_DAY, supporterToken);
     }
 
     private ResponseCookie createGuestCookie(String guestKey) {

@@ -39,7 +39,7 @@
 - **토큰 저장**:
   - access 토큰은 응답 본문으로 전달되며 **메모리에만 보관**하고 Bearer 헤더로 전송합니다(local/sessionStorage 저장 금지).
   - refresh 토큰은 `chak_refresh_token` **HttpOnly 쿠키**(`Path=/api/auth`)로도 내려갑니다. 쿠키로 받으면 JS가 다룰 필요가 없습니다.
-  - 전환 기간에는 응답 본문의 `refreshToken`도 함께 내려가며(서버 설정 `REFRESH_TOKEN_IN_BODY=true`), 쿠키 방식이 안정되면 본문에서 제거됩니다(`refreshToken: null`). 프론트는 본문 값에 의존하지 마세요.
+  - 운영(prod)에서는 응답 본문의 `refreshToken`이 `null`입니다(기본 `REFRESH_TOKEN_IN_BODY=false`). 로컬 개발에서만 본문에도 내려가며(`true`), 쿠키만 쓰는 프론트는 본문 값에 의존하지 마세요. XSS가 생겨도 토큰이 새지 않게 하려는 설정입니다.
   - 새로고침으로 메모리의 access 토큰이 사라지면 앱 시작 시 `POST /api/auth/refresh`(본문 없이, `credentials: "include"`)를 호출해 복구합니다. 쿠키도 없으면 `401 INVALID_REFRESH_TOKEN`이며 비로그인 상태로 처리합니다.
 - **에러 응답**: 404·405·415를 포함한 모든 에러는 `{ "code", "message" }` 형식이며 필드별 검증 상세는 없습니다. 프론트는 `code`로 분기하세요.
 - **JSON 필드 이름**: camelCase. 알 수 없는 필드는 무시, `null`은 허용되는 필드에서만 사용.
@@ -350,7 +350,8 @@ https://accounts.google.com/o/oauth2/v2/auth
 검증 규칙:
 
 - `schemaVersion`: 현재 `1`만 허용
-- `CARD`: `card.pages` 1~3개, 각 페이지는 객체, 카드 전체 JSON 500,000자 이하
+- `CARD`: `card.pages` 1~3개, 각 페이지는 객체, 카드 전체 JSON 500,000자 이하(**비회원은 100,000자 이하**, 넘으면 `INVALID_CARD_PAYLOAD`)
+- **보내는 횟수 제한(429)**: 같은 IP에서 비회원은 시간당 30건, 같은 비회원 쿠키는 시간당 20건, 로그인 회원은 시간당 60건을 넘으면 `TOO_MANY_MESSAGES`입니다. 또 한 책상이 시간당 300건, 하루 1,500건을 받으면 그 책상은 잠시 `DESK_BUSY`로 새 응원을 거절합니다(검증에 실패한 요청은 책상 상한에 세지 않습니다). IP는 헤더로 바꿀 수 있어서, 흩어진 주소로 한 책상에 쏟아지는 스팸은 책상별 상한이 막습니다.
 - **비회원은 사진을 첨부할 수 없습니다.** 비회원 요청의 카드 어느 페이지에든 `photoElements`가 비어 있지 않으면 `403 GUEST_IMAGE_NOT_ALLOWED`입니다(빈 배열은 허용). 사진은 로그인한 회원만 첨부할 수 있고, 이미지 업로드 API(6장)도 로그인이 필요합니다.
 - 페이지당 `stickerElements` 최대 10개, `photoElements` 최대 10개(배열이어야 하며 초과 시 `INVALID_CARD_PAYLOAD`). 텍스트 요소는 개수 제한 없음(전체 크기 한도만 적용)
 - `STICKER`: 카드 본문 생략 가능
@@ -1218,7 +1219,9 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 | 403 | `AD_NOT_COMPLETED` | 광고 시청 완료 기록이 없음 |
 | 409 | `MESSAGE_LOCKED` | 공개 시각 전 읽기 요청 |
 | 409 | `MEDIA_UPLOAD_NOT_FOUND` | S3에서 업로드 결과를 찾지 못함 |
-| 429 | `TOO_MANY_EVENTS` | 이벤트 요청 한도 초과 |
+| 429 | `TOO_MANY_EVENTS` | 이벤트·신고·주문 요청 한도 초과 |
+| 429 | `TOO_MANY_MESSAGES` | 같은 접속자가 응원을 너무 자주 보냄 |
+| 429 | `DESK_BUSY` | 한 책상에 응원이 한꺼번에 몰려 잠시 받지 않음 |
 | 502 | `KAKAO_API_ERROR` | 카카오 API 통신 또는 설정 오류 |
 | 502 | `GOOGLE_API_ERROR` | 구글 API 통신 또는 설정 오류 |
 | 502 | `STORAGE_API_ERROR` | Object Storage 통신 오류 |
