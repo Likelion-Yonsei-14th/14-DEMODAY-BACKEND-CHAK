@@ -55,11 +55,27 @@ public interface TrafficEventRepository extends JpaRepository<TrafficEvent, Long
     List<Object[]> findPageViewsBetween(@Param("from") Instant from, @Param("to") Instant to,
                                         @Param("excludedProvider") AuthProvider excludedProvider);
 
+    /** Test-only region events, never mixed into real visitor dashboards. */
+    @Query("""
+            select event.region, event.resourceType, count(event)
+            from TrafficEvent event
+            where event.eventType = com.likelion.chak.domain.TrafficEventType.PAGE_VIEW
+              and event.createdAt >= :from and event.createdAt < :to
+              and event.user.provider = :provider
+              and event.resourceType in ('LOAD_TEST_MEMBER', 'LOAD_TEST_GUEST')
+            group by event.region, event.resourceType
+            """)
+    List<Object[]> countLoadTestRegions(@Param("from") Instant from, @Param("to") Instant to,
+                                        @Param("provider") AuthProvider provider);
+
     @Query("""
             select event.eventType, count(event)
             from TrafficEvent event
+            left join event.user member
             where event.createdAt >= :from and event.createdAt < :to
+              and (member.id is null or member.provider <> :excludedProvider)
             group by event.eventType
             """)
-    List<Object[]> countByEventTypeBetween(@Param("from") Instant from, @Param("to") Instant to);
+    List<Object[]> countByEventTypeBetween(@Param("from") Instant from, @Param("to") Instant to,
+                                           @Param("excludedProvider") AuthProvider excludedProvider);
 }

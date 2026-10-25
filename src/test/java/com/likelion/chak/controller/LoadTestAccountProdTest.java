@@ -33,5 +33,8 @@ class LoadTestAccountProdTest {
         mvc.perform(get("/api/load-test/actual?date=2026-10-25")
                 .header("X-Chak-Load-Key", "01234567890123456789012345678901"))
                 .andExpect(status().isForbidden());
+        mvc.perform(get("/api/load-test/regions?date=2026-10-25")
+                .header("X-Chak-Load-Key", "01234567890123456789012345678901"))
+                .andExpect(status().isForbidden());
     }
 }
