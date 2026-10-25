@@ -35,6 +35,7 @@ public class ReplyService {
     private final PersonalMessageDeliveryRepository deliveryRepository;
     private final MessageReplyRepository replyRepository;
     private final MessageReplyTargetRepository targetRepository;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     @Transactional
     public ReplyResponse create(Long ownerId, ReplyCreateRequest request) {
@@ -71,6 +72,18 @@ public class ReplyService {
         List<MessageReplyTarget> targets = deliveries.stream()
                 .map(d -> targetRepository.save(MessageReplyTarget.create(reply, d.getMessage())))
                 .toList();
+        // 답장이 커밋된 뒤, 편지를 쓴 사람들에게 알림을 보낸다(알림은 푸시 구독이 있을 때만 나간다).
+        java.util.Set<Long> userIds = new java.util.HashSet<>();
+        java.util.Set<Long> guestIds = new java.util.HashSet<>();
+        for (MessageReplyTarget target : targets) {
+            Message message = target.getMessage();
+            if (message.getAuthorUser() != null) {
+                userIds.add(message.getAuthorUser().getId());
+            } else if (message.getAuthorGuest() != null) {
+                guestIds.add(message.getAuthorGuest().getId());
+            }
+        }
+        events.publishEvent(new com.likelion.chak.push.ReplyCreatedEvent(desk.getSupporterToken(), userIds, guestIds));
         return toResponse(reply, targets.stream().map(MessageReplyTarget::getMessage).toList());
     }
 

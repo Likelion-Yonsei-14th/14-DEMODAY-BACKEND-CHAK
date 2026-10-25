@@ -630,6 +630,22 @@ POST   /api/claims/{claimToken}   넘겨받기 { "confirmedRecipient": true }
   - 넘겨받으면 만든 사람의 권한은 끝나고 일반 서포터가 됩니다.
 - **삭제**는 현재 주인만 할 수 있습니다. 넘겨받기 전에는 만든 사람, 넘겨받은 뒤에는 받은 사람입니다(본인이 만든 책상도 같습니다). 주인이 아니거나 없는 책상은 `404 DESK_NOT_FOUND`입니다. 삭제하면 서포터 링크·넘겨받기 링크가 모두 열리지 않고, 삭제한 주인은 새 책상을 만들 수 있습니다. 응원 기록은 DB에 남습니다.
 
+### 5.10 답장 알림(웹 푸시)
+
+책상 주인이 답장을 보내면, 그 답장에 포함된 편지를 쓴 사람의 브라우저로 알림을 보냅니다. 알림 문구는 고정(`응원에 답장이 도착했어요`)이고 **답장 내용은 담지 않습니다**(잠금 화면에 보이므로). 눌렀을 때 `/desk/{supporterToken}/replies`로 이동합니다.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/api/public/push/key` | `{ "enabled": true, "publicKey": "…" }` — 서버에 VAPID 키가 설정돼 있을 때만 `enabled`. 브라우저가 구독할 때 이 공개키를 씁니다 |
+| PUT | `/api/public/push/subscription` | 구독 저장 `{ "endpoint": "https://…", "keys": { "p256dh": "…", "auth": "…" } }` → `204`. 로그인 회원 또는 응원을 남긴 적 있는(쿠키가 있는) 비회원만 가능(`401 IDENTITY_REQUIRED`) |
+| DELETE | `/api/public/push/subscription` | `{ "endpoint": "…" }` — 본인 구독만 지움. 없거나 남의 것이어도 `204` |
+
+- `endpoint`는 **알려진 푸시 서비스 주소만** 받습니다(`fcm.googleapis.com`, `*.push.services.mozilla.com`, `*.push.apple.com`, `*.notify.windows.com`, https, 기본 포트). 서버가 이 주소를 직접 호출하므로, 다른 주소는 `400 INVALID_PUSH_SUBSCRIPTION`입니다(서버 내부 주소로 요청을 보내게 하는 공격 방지). `p256dh`는 65바이트 공개키, `auth`는 16바이트 비밀(둘 다 base64url)이어야 합니다.
+- 같은 브라우저가 다시 구독하면 한 줄만 유지하고(구독한 사람은 지금 사람으로 바뀜), 계정(또는 비회원 쿠키) 하나에 최대 5개 브라우저까지입니다(넘으면 `429 TOO_MANY_EVENTS`).
+- VAPID 키가 없으면 `GET /key`는 `enabled: false`이고 구독은 `503 PUSH_NOT_AVAILABLE`입니다.
+- 알림은 답장이 커밋된 뒤 서버 안의 별도 스레드가 보내며, 실패해도 답장에는 영향이 없습니다. 푸시 서비스가 `404`·`410`을 돌려주면(브라우저가 구독을 지움) 구독을 지우고, 연속 5번 실패해도 지웁니다. 180일 동안 전달이 한 번도 안 된 구독은 정리 배치가 지웁니다. 회원 탈퇴 처리 때 그 회원의 구독도 지웁니다.
+- 암호화는 RFC 8291(aes128gcm), 서버 신원 증명은 VAPID(RFC 8292)이며 JDK 암호 기능만 씁니다(표준 문서의 예시 값으로 검증하는 테스트 포함).
+
 ## 6. 이미지 업로드 API
 
 Bearer 인증이 필요합니다. 지원 형식은 JPEG, PNG, WebP, GIF이며 프로필은 최대 5MB, 카드는 최대 10MB입니다.
@@ -1274,6 +1290,8 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 | 400 | `INVALID_MINIGAME_RESULT` | 폰 게임 결과가 규칙·시간 검사에 맞지 않음 |
 | 400 | `INVALID_MINIGAME_ANSWERS` | 답 개수가 문항 수와 다르거나 1~5가 아님 |
 | 400 | `INVALID_NICKNAME` | 닉네임 형식 오류 |
+| 400 | `INVALID_PUSH_SUBSCRIPTION` | 알림 구독 주소·키가 올바르지 않음(알려진 푸시 서비스가 아님 등) |
+| 503 | `PUSH_NOT_AVAILABLE` | 서버에 알림 키가 설정되지 않음 |
 | 400 | `INVALID_DISPLAY_NAME` | 프로필 이름 형식 오류 |
 | 400 | `INVALID_AVATAR` | 프로필 사진 형식·크기·내용 오류 |
 | 404 | `AVATAR_NOT_FOUND` | 프로필 사진을 찾을 수 없음 |

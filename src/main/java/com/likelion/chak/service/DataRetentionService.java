@@ -18,6 +18,7 @@ import java.sql.Timestamp;
  *   <li>refresh_tokens: 만료됐거나 폐기된 지 7일이 지난 토큰(로그인 갱신 때마다 한 줄씩 늘어난다)</li>
  *   <li>traffic_events: 오래된 접속 기록(어드민 통계는 최근 기간만 본다)</li>
  *   <li>minigame_rounds: 제출하지 않고 버려진 판(2일 지남)과 비회원이 제출한 판(30일 지남). 회원의 기록은 랭킹이라 남긴다</li>
+ *   <li>push_subscriptions: 180일 동안 알림이 한 번도 전달되지 않은 구독(브라우저가 조용히 사라진 경우)</li>
  *   <li>promotion_inquiries: 1년이 지난 광고 상담 신청(담당자 연락처가 들어 있는 개인정보)</li>
  * </ul>
  * 한 번에 많이 지우면 DB가 오래 잠기므로 작은 묶음으로 나눠 지우고, 한 번 실행에 지우는 양에 상한을 둔다.
@@ -30,6 +31,7 @@ public class DataRetentionService {
     static final int MAX_BATCHES_PER_TABLE = 100;
     static final int UNSUBMITTED_ROUND_DAYS = 2;
     static final int GUEST_ROUND_DAYS = 30;
+    static final int STALE_PUSH_DAYS = 180;
 
     private final JdbcTemplate jdbc;
     private final Clock clock;
@@ -78,11 +80,17 @@ public class DataRetentionService {
                     SELECT id FROM minigame_rounds
                     WHERE (submitted_at IS NULL AND created_at < ?) OR (user_id IS NULL AND created_at < ?) LIMIT %d
                   ) doomed)""".formatted(BATCH_SIZE), cutoff(UNSUBMITTED_ROUND_DAYS), cutoff(GUEST_ROUND_DAYS));
-        if (tokens > 0 || events > 0 || inquiries > 0 || rounds > 0) {
-            log.info("Data retention: deleted {} refresh tokens, {} traffic events, {} promotion inquiries, {} minigame rounds",
-                    tokens, events, inquiries, rounds);
+        int pushes = deleteInBatches("""
+                DELETE FROM push_subscriptions WHERE id IN (
+                  SELECT id FROM (
+                    SELECT id FROM push_subscriptions
+                    WHERE COALESCE(last_success_at, created_at) < ? LIMIT %d
+                  ) doomed)""".formatted(BATCH_SIZE), cutoff(STALE_PUSH_DAYS));
+        if (tokens > 0 || events > 0 || inquiries > 0 || rounds > 0 || pushes > 0) {
+            log.info("Data retention: deleted {} refresh tokens, {} traffic events, {} promotion inquiries, {} minigame rounds, {} push subscriptions",
+                    tokens, events, inquiries, rounds, pushes);
         }
-        return new int[]{tokens, events, inquiries, rounds};
+        return new int[]{tokens, events, inquiries, rounds, pushes};
     }
 
     private int deleteInBatches(String sql, Object... args) {

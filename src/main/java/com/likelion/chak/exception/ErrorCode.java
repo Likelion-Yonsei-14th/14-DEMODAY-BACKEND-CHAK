@@ -74,6 +74,8 @@ public enum ErrorCode {
     INVALID_DISPLAY_NAME(HttpStatus.BAD_REQUEST, "INVALID_DISPLAY_NAME", "이름은 한글·영문·숫자·공백·마침표·밑줄·하이픈·괄호로 1~20자여야 합니다."),
     INVALID_AVATAR(HttpStatus.BAD_REQUEST, "INVALID_AVATAR", "프로필 사진을 처리할 수 없습니다. JPEG·PNG·WebP 150KB 이하 사진을 올려주세요."),
     AVATAR_NOT_FOUND(HttpStatus.NOT_FOUND, "AVATAR_NOT_FOUND", "프로필 사진을 찾을 수 없습니다."),
+    PUSH_NOT_AVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "PUSH_NOT_AVAILABLE", "알림 기능이 아직 준비되지 않았습니다."),
+    INVALID_PUSH_SUBSCRIPTION(HttpStatus.BAD_REQUEST, "INVALID_PUSH_SUBSCRIPTION", "알림 구독 정보가 올바르지 않습니다."),
     INVALID_NICKNAME(HttpStatus.BAD_REQUEST, "INVALID_NICKNAME", "닉네임은 한글·영문·숫자·밑줄·공백으로 2~12자여야 합니다."),
     NICKNAME_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "NICKNAME_NOT_ALLOWED", "사용할 수 없는 닉네임입니다. 다른 닉네임을 입력해주세요."),
     PUBLIC_FEED_DISABLED(HttpStatus.FORBIDDEN, "PUBLIC_FEED_DISABLED", "공개 응원 보기가 비활성화되어 있습니다."),
