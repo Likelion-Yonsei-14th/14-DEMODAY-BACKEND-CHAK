@@ -4,6 +4,7 @@ import com.likelion.chak.domain.AuthProvider;
 import com.likelion.chak.domain.UserAccount;
 import com.likelion.chak.dto.AuthTokenResponse;
 import com.likelion.chak.repository.UserAccountRepository;
+import com.likelion.chak.repository.TrafficEventRepository;
 import com.likelion.chak.service.TokenService;
 import com.likelion.chak.service.AdminStatsService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 /** Provisions marked test users when a strong server-side key is configured. */
 @RestController
@@ -36,6 +38,7 @@ public class LoadTestAccountController {
     private final UserAccountRepository users;
     private final TokenService tokens;
     private final AdminStatsService stats;
+    private final TrafficEventRepository traffic;
 
     @Value("${chak.load-test.provision-key:}")
     private String provisionKey;
@@ -43,6 +46,21 @@ public class LoadTestAccountController {
     public record ProvisionRequest(String runId, int count) {}
     public record ProvisionedAccount(long userId, String accessToken, String refreshToken, long expiresIn) {}
     public record ActualVisitors(LocalDate date, long members, long guests) {}
+    public record RegionCount(String region, String trafficType, long visits) {}
+    public record RegionLoad(LocalDate date, List<RegionCount> regions) {}
+
+    @GetMapping("/regions")
+    public ResponseEntity<RegionLoad> regions(
+            @RequestHeader(value = "X-Chak-Load-Key", required = false) String providedKey,
+            @RequestParam("date") LocalDate date) {
+        if (!authorized(providedKey)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        var zone = ZoneId.of("Asia/Seoul");
+        var rows = traffic.countLoadTestRegions(date.atStartOfDay(zone).toInstant(),
+                date.plusDays(1).atStartOfDay(zone).toInstant(), AuthProvider.TEST);
+        var result = rows.stream().map(row -> new RegionCount((String) row[0],
+                ((String) row[1]).replace("LOAD_TEST_", "").toLowerCase(), ((Number) row[2]).longValue())).toList();
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(new RegionLoad(date, result));
+    }
 
     @GetMapping("/actual")
     public ResponseEntity<ActualVisitors> actual(

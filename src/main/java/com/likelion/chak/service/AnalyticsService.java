@@ -4,6 +4,7 @@ import com.likelion.chak.domain.GuestIdentity;
 import com.likelion.chak.domain.TrafficEvent;
 import com.likelion.chak.domain.TrafficEventType;
 import com.likelion.chak.domain.UserAccount;
+import com.likelion.chak.domain.AuthProvider;
 import com.likelion.chak.dto.AnalyticsSummaryResponse;
 import com.likelion.chak.dto.EventRecordedResponse;
 import com.likelion.chak.dto.TrafficEventRequest;
@@ -124,7 +125,7 @@ public class AnalyticsService {
         return new AnalyticsSummaryResponse(
                 from,
                 to,
-                toMap(trafficEventRepository.countByEventTypeBetween(from, to)),
+                toMap(trafficEventRepository.countByEventTypeBetween(from, to, AuthProvider.TEST)),
                 toMap(advertisementEventRepository.countByEventTypeBetween(from, to)));
     }
 

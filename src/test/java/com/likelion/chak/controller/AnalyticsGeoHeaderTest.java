@@ -52,6 +52,40 @@ class AnalyticsGeoHeaderTest {
         assertThat(blank.getRegion()).isEqualTo("27");
     }
 
+    private String recordWithBodyGeo(String geoFields, String... headers) throws Exception {
+        String eventId = UUID.randomUUID().toString();
+        var request = post("/api/public/analytics/events").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"eventId\":\"" + eventId + "\",\"eventType\":\"PAGE_VIEW\",\"sessionId\":\"s-1\",\"path\":\"/home\"," + geoFields + "}");
+        for (int i = 0; i < headers.length; i += 2) request.header(headers[i], headers[i + 1]);
+        mockMvc.perform(request).andExpect(status().isCreated());
+        return eventId;
+    }
+
+    @Test
+    void locationInTheBodyIsStoredWhenNoHeaderCarriesIt() throws Exception {
+        var event = trafficEventRepository.findByEventId(recordWithBodyGeo("\"geoCountry\":\"kr\",\"geoRegion\":\"11\"")).orElseThrow();
+        assertThat(event.getCountry()).isEqualTo("KR");
+        assertThat(event.getRegion()).isEqualTo("11");
+    }
+
+    @Test
+    void headersStillWinOverTheBody() throws Exception {
+        var event = trafficEventRepository.findByEventId(recordWithBodyGeo(
+                "\"geoCountry\":\"KR\",\"geoRegion\":\"26\"", "X-Chak-Geo-Country", "KR", "X-Chak-Geo-Region", "11")).orElseThrow();
+        assertThat(event.getRegion()).isEqualTo("11");
+    }
+
+    @Test
+    void junkLocationInTheBodyIsIgnoredAndTooLongValuesAreRejected() throws Exception {
+        var junk = trafficEventRepository.findByEventId(recordWithBodyGeo("\"geoCountry\":\"1!\",\"geoRegion\":\"<script>\"")).orElseThrow();
+        assertThat(junk.getCountry()).isNull();
+        assertThat(junk.getRegion()).isNull();
+
+        mockMvc.perform(post("/api/public/analytics/events").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"eventId\":\"" + UUID.randomUUID() + "\",\"eventType\":\"PAGE_VIEW\",\"path\":\"/\",\"geoCountry\":\"KOR\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test
     void noHeadersLeavesLocationUnknown() throws Exception {
         var event = trafficEventRepository.findByEventId(record()).orElseThrow();
