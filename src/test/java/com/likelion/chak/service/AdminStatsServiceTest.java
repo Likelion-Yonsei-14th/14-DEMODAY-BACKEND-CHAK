@@ -74,7 +74,7 @@ class AdminStatsServiceTest {
     }
 
     @Test
-    void testAccountsDoNotIncreaseSignupOrUserStats() {
+    void testVisitsIncreaseVisitorStatsWithoutCountingAsSignups() {
         LocalDate today = LocalDate.now(AdminStatsService.KST);
         DailyStatsResponse before = statsService.daily(today, today);
         UserAccount testUser = userRepository.save(UserAccount.create(AuthProvider.TEST, "loadtest:" + UUID.randomUUID(), "부하시험", null, null));
@@ -82,8 +82,8 @@ class AdminStatsServiceTest {
         DailyStatsResponse after = statsService.daily(today, today);
         assertThat(after.totalUsers()).isEqualTo(before.totalUsers());
         assertThat(after.days().get(0).signups()).isEqualTo(before.days().get(0).signups());
-        assertThat(after.days().get(0).memberVisitors()).isEqualTo(before.days().get(0).memberVisitors());
-        assertThat(after.days().get(0).pageViews()).isEqualTo(before.days().get(0).pageViews());
+        assertThat(after.days().get(0).memberVisitors()).isEqualTo(before.days().get(0).memberVisitors() + 1);
+        assertThat(after.days().get(0).pageViews()).isEqualTo(before.days().get(0).pageViews() + 1);
     }
 
     @Test

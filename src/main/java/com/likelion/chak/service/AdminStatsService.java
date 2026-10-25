@@ -52,15 +52,18 @@ public class AdminStatsService {
         Instant toInstant = end.plusDays(1).atStartOfDay(KST).toInstant();
 
         Map<LocalDate, Set<Long>> members = new HashMap<>();
-        Map<LocalDate, Set<Long>> guests = new HashMap<>();
+        Map<LocalDate, Set<String>> guests = new HashMap<>();
         Map<LocalDate, Long> views = new HashMap<>();
-        for (Object[] row : trafficRepository.findPageViewsBetween(fromInstant, toInstant, AuthProvider.TEST)) {
+        for (Object[] row : trafficRepository.findPageViewsBetween(fromInstant, toInstant)) {
             LocalDate day = day((Instant) row[0]);
             views.merge(day, 1L, Long::sum);
-            if (row[1] != null) {
+            if (row[7] == AuthProvider.TEST && "LOAD_TEST_GUEST".equals(row[5])) {
+                // Earlier smoke events used a TEST token even for a guest visit.
+                guests.computeIfAbsent(day, k -> new HashSet<>()).add("test:" + row[6]);
+            } else if (row[1] != null) {
                 members.computeIfAbsent(day, k -> new HashSet<>()).add((Long) row[1]);
             } else if (row[2] != null) {
-                guests.computeIfAbsent(day, k -> new HashSet<>()).add((Long) row[2]);
+                guests.computeIfAbsent(day, k -> new HashSet<>()).add("g:" + row[2]);
             }
         }
         Map<LocalDate, Long> signups = countByDay(userRepository.findCreatedAtBetweenExcludingProvider(fromInstant, toInstant, AuthProvider.TEST));
@@ -97,7 +100,7 @@ public class AdminStatsService {
         Map<Key, Long> views = new TreeMap<>(Comparator.comparing(Key::country, Comparator.nullsFirst(String::compareTo))
                 .thenComparing(Key::region, Comparator.nullsFirst(String::compareTo)));
         long unknown = 0;
-        for (Object[] row : trafficRepository.findPageViewsBetween(fromInstant, toInstant, AuthProvider.TEST)) {
+        for (Object[] row : trafficRepository.findPageViewsBetween(fromInstant, toInstant)) {
             String country = (String) row[3];
             String region = (String) row[4];
             if (country == null && region == null) {
@@ -106,7 +109,8 @@ public class AdminStatsService {
             }
             Key key = new Key(country, region);
             views.merge(key, 1L, Long::sum);
-            String who = row[1] != null ? "u" + row[1] : row[2] != null ? "g" + row[2] : null;
+            String who = row[7] == AuthProvider.TEST && "LOAD_TEST_GUEST".equals(row[5]) ? "test:" + row[6]
+                    : row[1] != null ? "u" + row[1] : row[2] != null ? "g" + row[2] : null;
             if (who != null) {
                 visitors.computeIfAbsent(key, k -> new HashSet<>()).add(who);
             }

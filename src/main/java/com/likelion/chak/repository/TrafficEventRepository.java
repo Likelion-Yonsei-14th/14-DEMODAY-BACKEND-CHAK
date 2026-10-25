@@ -43,19 +43,18 @@ public interface TrafficEventRepository extends JpaRepository<TrafficEvent, Long
             @Param("country") String country,
             @Param("region") String region);
 
-    /** 기간 안의 페이지 조회(접속자 통계용). 행: 시각, 회원 id, 비회원 id, 국가, 시·도. */
+    /** 기간 안의 페이지 조회(접속자 통계용). 행: 시각, 회원 id, 비회원 id, 국가, 시·도, 리소스 종류, 이벤트 id, 로그인 제공자. */
     @Query("""
-            select event.createdAt, event.user.id, event.guest.id, event.country, event.region
+            select event.createdAt, event.user.id, event.guest.id, event.country, event.region,
+                   event.resourceType, event.eventId, member.provider
             from TrafficEvent event
             left join event.user member
             where event.eventType = com.likelion.chak.domain.TrafficEventType.PAGE_VIEW
               and event.createdAt >= :from and event.createdAt < :to
-              and (member.id is null or member.provider <> :excludedProvider)
             """)
-    List<Object[]> findPageViewsBetween(@Param("from") Instant from, @Param("to") Instant to,
-                                        @Param("excludedProvider") AuthProvider excludedProvider);
+    List<Object[]> findPageViewsBetween(@Param("from") Instant from, @Param("to") Instant to);
 
-    /** Test-only region events, never mixed into real visitor dashboards. */
+    /** TEST 회원이 기록한 지역 방문의 별도 운영 조회용 집계. */
     @Query("""
             select event.region, event.resourceType, count(event)
             from TrafficEvent event
@@ -71,11 +70,8 @@ public interface TrafficEventRepository extends JpaRepository<TrafficEvent, Long
     @Query("""
             select event.eventType, count(event)
             from TrafficEvent event
-            left join event.user member
             where event.createdAt >= :from and event.createdAt < :to
-              and (member.id is null or member.provider <> :excludedProvider)
             group by event.eventType
             """)
-    List<Object[]> countByEventTypeBetween(@Param("from") Instant from, @Param("to") Instant to,
-                                           @Param("excludedProvider") AuthProvider excludedProvider);
+    List<Object[]> countByEventTypeBetween(@Param("from") Instant from, @Param("to") Instant to);
 }
