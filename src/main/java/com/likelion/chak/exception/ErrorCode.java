@@ -70,6 +70,7 @@ public enum ErrorCode {
     MINIGAME_ROUND_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "MINIGAME_ROUND_ALREADY_SUBMITTED", "이미 제출한 게임입니다."),
     INVALID_MINIGAME_ANSWERS(HttpStatus.BAD_REQUEST, "INVALID_MINIGAME_ANSWERS", "제출한 답이 올바르지 않습니다."),
     INVALID_MINIGAME_RESULT(HttpStatus.BAD_REQUEST, "INVALID_MINIGAME_RESULT", "게임 결과가 올바르지 않습니다."),
+    INVALID_D1_COURSE_RESPONSE(HttpStatus.BAD_REQUEST, "INVALID_D1_COURSE_RESPONSE", "코스 응답 형식이 올바르지 않습니다."),
     INVALID_NICKNAME(HttpStatus.BAD_REQUEST, "INVALID_NICKNAME", "닉네임은 한글·영문·숫자·밑줄·공백으로 2~12자여야 합니다."),
     NICKNAME_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "NICKNAME_NOT_ALLOWED", "사용할 수 없는 닉네임입니다. 다른 닉네임을 입력해주세요."),
     PUBLIC_FEED_DISABLED(HttpStatus.FORBIDDEN, "PUBLIC_FEED_DISABLED", "공개 응원 보기가 비활성화되어 있습니다."),

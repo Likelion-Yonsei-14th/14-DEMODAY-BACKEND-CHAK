@@ -103,6 +103,22 @@ public final class AdminDtos {
     public record StudyTypeAdminStats(long total, long members, long today, long last7Days, List<StudyTypeShareStat> distribution) {
     }
 
-    public record MinigameStatsResponse(List<MinigameGameStats> games, StudyTypeAdminStats studyType) {
+    public record KeyCount(String key, long count) {
+    }
+
+    /** D+1 코스 짜기: 응답 수와 선택지별 분포(많은 순). 활동은 한 응답이 세 개를 고르므로 합이 응답 수의 3배다. */
+    public record D1CourseAdminStats(
+            long total,
+            long today,
+            long last7Days,
+            long shared,
+            List<KeyCount> areas,
+            List<KeyCount> activities,
+            List<KeyCount> companions,
+            List<KeyCount> budgets,
+            List<KeyCount> regions) {
+    }
+
+    public record MinigameStatsResponse(List<MinigameGameStats> games, StudyTypeAdminStats studyType, D1CourseAdminStats d1Course) {
     }
 }

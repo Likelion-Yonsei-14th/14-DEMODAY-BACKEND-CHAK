@@ -87,4 +87,22 @@ public final class MinigameDtos {
 
     public record NicknameResponse(String nickname, String defaultNickname) {
     }
+
+    /**
+     * D+1 코스 짜기 응답. 선택지 id는 프런트 {@code d1CourseConfig.ts}와 같고, 시·군·구는 한글 이름으로 받는다.
+     * {@code responseId}가 같으면 같은 응답을 다시 보낸 것으로 보고 공유했음 표시만 올린다.
+     */
+    public record D1CourseRequest(
+            @NotBlank @Pattern(regexp = "^[0-9a-fA-F-]{36}$") String responseId,
+            @NotBlank @Size(max = 20) String startRegion,
+            @Size(max = 10) @Pattern(regexp = "^[가-힣0-9 ]*$") String startDistrict,
+            @NotBlank @Size(max = 20) String area,
+            @NotNull @Size(min = 3, max = 3) List<@NotBlank @Size(max = 20) String> activities,
+            @NotBlank @Size(max = 20) String companion,
+            @NotBlank @Size(max = 20) String budget,
+            boolean shared) {
+    }
+
+    public record D1CourseReceived(boolean received) {
+    }
 }

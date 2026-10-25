@@ -1,11 +1,14 @@
 package com.likelion.chak.service;
 
 import com.likelion.chak.domain.MinigameType;
+import com.likelion.chak.dto.AdminDtos.D1CourseAdminStats;
 import com.likelion.chak.dto.AdminDtos.MinigameDay;
 import com.likelion.chak.dto.AdminDtos.MinigameGameStats;
 import com.likelion.chak.dto.AdminDtos.MinigameStatsResponse;
 import com.likelion.chak.dto.AdminDtos.StudyTypeAdminStats;
 import com.likelion.chak.dto.AdminDtos.StudyTypeShareStat;
+import com.likelion.chak.repository.D1CourseResponseRepository;
+import com.likelion.chak.repository.D1CourseResponseRepository.KeyCount;
 import com.likelion.chak.repository.MinigameRoundRepository;
 import com.likelion.chak.repository.StudyTypeResultRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +32,7 @@ public class AdminMinigameStatsService {
     private final MinigameRoundRepository roundRepository;
     private final StudyTypeResultRepository studyTypeRepository;
     private final StudyTypeService studyTypeService;
+    private final D1CourseResponseRepository d1CourseRepository;
 
     @Transactional(readOnly = true)
     public MinigameStatsResponse stats() {
@@ -37,7 +41,7 @@ public class AdminMinigameStatsService {
         for (MinigameType game : MinigameType.values()) {
             games.add(game(game, today));
         }
-        return new MinigameStatsResponse(games, studyType(today));
+        return new MinigameStatsResponse(games, studyType(today), d1Course(today));
     }
 
     private MinigameGameStats game(MinigameType game, LocalDate today) {
@@ -93,5 +97,37 @@ public class AdminMinigameStatsService {
                 studyTypeRepository.countByCreatedAtGreaterThanEqual(todayStart),
                 studyTypeRepository.countByCreatedAtGreaterThanEqual(weekStart),
                 distribution);
+    }
+
+    private D1CourseAdminStats d1Course(LocalDate today) {
+        Instant todayStart = today.atStartOfDay(KST).toInstant();
+        Instant weekStart = today.minusDays(6).atStartOfDay(KST).toInstant();
+        java.util.Map<String, Long> activities = new java.util.HashMap<>();
+        for (List<KeyCount> rows : List.of(d1CourseRepository.countByActivity1(),
+                d1CourseRepository.countByActivity2(), d1CourseRepository.countByActivity3())) {
+            rows.forEach(row -> activities.merge(row.getKey(), row.getCount(), Long::sum));
+        }
+        return new D1CourseAdminStats(
+                d1CourseRepository.count(),
+                d1CourseRepository.countByCreatedAtGreaterThanEqual(todayStart),
+                d1CourseRepository.countByCreatedAtGreaterThanEqual(weekStart),
+                d1CourseRepository.countBySharedTrue(),
+                ranked(d1CourseRepository.countByArea()),
+                activities.entrySet().stream()
+                        .map(e -> new com.likelion.chak.dto.AdminDtos.KeyCount(e.getKey(), e.getValue()))
+                        .sorted(BY_COUNT).toList(),
+                ranked(d1CourseRepository.countByCompanion()),
+                ranked(d1CourseRepository.countByBudget()),
+                ranked(d1CourseRepository.countByRegion()));
+    }
+
+    private static final java.util.Comparator<com.likelion.chak.dto.AdminDtos.KeyCount> BY_COUNT =
+            java.util.Comparator.comparingLong(com.likelion.chak.dto.AdminDtos.KeyCount::count).reversed()
+                    .thenComparing(com.likelion.chak.dto.AdminDtos.KeyCount::key);
+
+    private static List<com.likelion.chak.dto.AdminDtos.KeyCount> ranked(List<KeyCount> rows) {
+        return rows.stream()
+                .map(row -> new com.likelion.chak.dto.AdminDtos.KeyCount(row.getKey(), row.getCount()))
+                .sorted(BY_COUNT).toList();
     }
 }

@@ -24,7 +24,9 @@ public class MinigameRateLimiter {
         GUESS_GOD_ROUND(60, 3_600_000L),
         /** 한 판이 30초라 사람이 시간당 낼 수 있는 판 수보다 넉넉하게 100판. */
         SNEAKY_PHONE_ROUND(100, 3_600_000L),
-        STUDY_TYPE_RESULT(20, 600_000L);
+        STUDY_TYPE_RESULT(20, 600_000L),
+        /** 코스 응답은 한 판에 한두 번 보내고, 학교 공용 와이파이처럼 한 주소에 여럿이 있을 수 있어 넉넉하게 시간당 60건. */
+        D1_COURSE_RESPONSE(60, 3_600_000L);
 
         final int limit;
         final long windowMs;
