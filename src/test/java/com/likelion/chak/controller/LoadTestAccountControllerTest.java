@@ -68,7 +68,7 @@ class LoadTestAccountControllerTest {
     }
 
     @Test
-    void recordsTestRegionWithoutChangingRealVisitorCounts() throws Exception {
+    void recordsTestRegionAndIncludesVisitInAdminGuestCounts() throws Exception {
         String today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).toString();
         String key = "01234567890123456789012345678901";
         String beforeBody = mvc.perform(get("/api/load-test/actual").param("date", today)
@@ -102,6 +102,6 @@ class LoadTestAccountControllerTest {
         var after = json.readTree(mvc.perform(get("/api/load-test/actual").param("date", today)
                 .header("X-Chak-Load-Key", key)).andReturn().getResponse().getContentAsString());
         assertThat(after.get("members").asLong()).isEqualTo(before.get("members").asLong());
-        assertThat(after.get("guests").asLong()).isEqualTo(before.get("guests").asLong());
+        assertThat(after.get("guests").asLong()).isEqualTo(before.get("guests").asLong() + 1);
     }
 }
