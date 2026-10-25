@@ -19,6 +19,7 @@
 | V13 | minigame_rounds(찍신 한 판), minigame_profiles(랭킹 닉네임), study_type_results(유형 테스트 결과) |
 | V14 | d1_course_responses(D+1 코스 짜기 응답, 통계용) |
 | V15 | users.profile_customized, user_avatars(직접 올린 프로필 사진) |
+| V16 | push_subscriptions(답장 알림 웹 푸시 구독) |
 | V11 | personal_desks `claim_token`(넘겨받기 링크, UNIQUE)·`claimed_at`·`deleted_at`(삭제 표시) |
 | V10 | admin_invites(이메일로 운영자 권한 초대, 최초 운영자 시드) |
 | V9 | users `last_login_at`·`deleted_at`(탈퇴 익명화), traffic_events `country`·`region`(접속 지역, IP 미저장), admin_audit_logs |
@@ -318,3 +319,8 @@ UNIQUE `(advertisement_id, event_type, session_id)` — 재시도 중복 방지.
 
 - `users.profile_customized`: 회원이 이름을 직접 고쳤는지. 참이면 로그인할 때 카카오·구글 이름으로 `display_name`을 덮어쓰지 않습니다(이메일과 `profile_image_url`은 계속 제공자를 따름). 탈퇴 처리 때 거짓으로 되돌립니다.
 - `user_avatars`: `user_id`(PK, 회원당 한 장), `avatar_key`(공개 주소에 쓰는 난수·고유, 올릴 때마다 새로 만듦), `content_type`(`image/jpeg`·`png`·`webp`), `image_base64`(LONGTEXT, 풀어서 150KB 이하), `updated_at`. 탈퇴 처리 때 삭제합니다.
+
+## 답장 알림 구독 (V16)
+
+- `push_subscriptions`: `user_id` 또는 `guest_id`(둘 중 하나), `endpoint`(고유, 알려진 푸시 서비스 주소), `p256dh`·`auth`(받는 브라우저의 암호 키), `created_at`, `last_success_at`, `failure_count`. 인덱스 `user_id`, `guest_id`.
+- 회원 탈퇴 처리 때 그 회원의 구독을 지우고, 180일 동안 알림이 한 번도 전달되지 않은 구독은 정리 배치가 지웁니다.

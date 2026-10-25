@@ -125,3 +125,11 @@ EC2 t3.small ≈ $19, RDS db.t4g.micro + 20GB ≈ $19, 공인 IPv4 ≈ $4, 시�
 
 - 로그인 없이 쓸 수 있는 쓰기(응원 보내기, 신고, 주문)는 접속자별·책상별로 제한합니다(`PublicWriteLimiter`, API.md 5장). 제한은 서버 메모리에 있어서 서버를 다시 띄우면 초기화됩니다. 한도를 한꺼번에 늘려야 할 때는 `chak.limit.scale`(환경변수 `CHAK_LIMIT_SCALE`, 기본 1)로 배수를 줍니다.
 - 운영의 리프레시 토큰은 쿠키로만 내려갑니다(`REFRESH_TOKEN_IN_BODY` 기본 false). 서버의 `run.sh`나 시크릿에 `REFRESH_TOKEN_IN_BODY=true`가 따로 들어 있으면 기본값을 덮어쓰므로, 배포 뒤에 `POST /api/auth/refresh` 응답에 `refreshToken`이 `null`인지 확인합니다.
+
+## 답장 알림(웹 푸시) 설정
+
+- 서버 시크릿 `chak/prod/app`(Secrets Manager)에 VAPID 키 두 개를 넣고 앱을 다시 띄우면 켜집니다. 키가 없으면 기능이 꺼져 있고(`GET /api/public/push/key`가 `enabled:false`) 다른 기능에는 영향이 없습니다.
+  - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`(선택: `VAPID_SUBJECT`, 기본 `mailto:chak.live.team@gmail.com`)
+  - 새 키 쌍은 `java scripts/VapidKeys.java`로 만듭니다. **개인키는 비밀이라 저장소·채팅에 남기지 말고 바로 시크릿에 넣습니다.**
+  - 키를 바꾸면 기존 구독은 모두 쓸 수 없게 되므로(브라우저가 다시 구독해야 함) 정말 필요할 때만 바꿉니다.
+- 알림은 서버 안의 별도 스레드 2개가 보냅니다. 푸시 서비스(구글·애플·모질라 등)로 나가는 https 통신이 막혀 있지 않아야 합니다.
