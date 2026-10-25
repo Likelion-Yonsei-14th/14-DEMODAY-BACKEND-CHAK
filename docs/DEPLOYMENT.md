@@ -120,3 +120,8 @@ EC2 t3.small ≈ $19, RDS db.t4g.micro + 20GB ≈ $19, 공인 IPv4 ≈ $4, 시�
 - **CloudFront → EC2 구간은 HTTP**다(AWS 내부 통신, 보안 그룹이 CloudFront 주소 대역만 허용). 사용자 구간은 HTTPS다. 도메인을 구입하면 ALB/ACM으로 끝까지 암호화할 수 있다.
 - 서버 시간대는 `Asia/Seoul`로 고정해(`-Duser.timezone`) 매일 열람 시각이 어긋나지 않게 했다.
 - DB는 단일 인스턴스(Multi-AZ 아님)다. 삭제 시 스냅샷을 남긴다(`DeletionPolicy: Snapshot`). 이미지 버킷은 스택을 지워도 남는다(`Retain`).
+
+## 공개 쓰기 제한과 리프레시 토큰 (운영 점검)
+
+- 로그인 없이 쓸 수 있는 쓰기(응원 보내기, 신고, 주문)는 접속자별·책상별로 제한합니다(`PublicWriteLimiter`, API.md 5장). 제한은 서버 메모리에 있어서 서버를 다시 띄우면 초기화됩니다. 한도를 한꺼번에 늘려야 할 때는 `chak.limit.scale`(환경변수 `CHAK_LIMIT_SCALE`, 기본 1)로 배수를 줍니다.
+- 운영의 리프레시 토큰은 쿠키로만 내려갑니다(`REFRESH_TOKEN_IN_BODY` 기본 false). 서버의 `run.sh`나 시크릿에 `REFRESH_TOKEN_IN_BODY=true`가 따로 들어 있으면 기본값을 덮어쓰므로, 배포 뒤에 `POST /api/auth/refresh` 응답에 `refreshToken`이 `null`인지 확인합니다.
