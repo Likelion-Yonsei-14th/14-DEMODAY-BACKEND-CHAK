@@ -61,8 +61,13 @@ public class PublicAnalyticsController {
         UserAccount user = principal == null ? null : authService.getUser(principal.userId());
         GuestSession guestSession = user == null ? guestIdentityService.resolveOrCreateLimited(guestKey, ClientIp.of(http)) : null;
         GuestIdentity guest = guestSession == null ? null : guestSession.getGuestIdentity();
-        EventRecordedResponse response = analyticsService.record(user, guest, request, AnalyticsService.Geo.fromHeaders(
-                firstNonBlank(chakCountry, vercelCountry), firstNonBlank(chakRegion, vercelRegion)));
+        AnalyticsService.Geo geo = AnalyticsService.Geo.fromHeaders(
+                firstNonBlank(chakCountry, vercelCountry), firstNonBlank(chakRegion, vercelRegion));
+        if (geo == null) {
+            // 헤더가 CloudFront를 지나며 사라지는 경우를 위해, 프론트가 본문에 실어 보낸 값을 대신 쓴다.
+            geo = AnalyticsService.Geo.fromHeaders(request.geoCountry(), request.geoRegion());
+        }
+        EventRecordedResponse response = analyticsService.record(user, guest, request, geo);
 
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.CREATED);
         if (guestSession != null && guestSession.isCreated()) {

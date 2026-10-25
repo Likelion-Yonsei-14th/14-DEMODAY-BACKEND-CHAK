@@ -963,7 +963,7 @@ GET /api/admin/stats/regions?from=…&to=…                     접속 지역(�
 - 날짜는 `yyyy-MM-dd`이고 **한국 시간(Asia/Seoul)** 기준입니다. 생략하면 일별은 최근 14일, 지역은 최근 30일이며 최대 92일까지입니다(초과·역순은 `400`).
 - 일별: `date, visitors(회원+비회원 고유 접속자), memberVisitors, guestVisitors, pageViews, signups, desksCreated, messagesCreated, chargeAmount(승인된 충전 금액)`. 활동이 없는 날도 0으로 포함하고, 응답 앞부분에 전체 `totalUsers`(탈퇴 제외)·`totalDesks`·`totalMessages`가 옵니다.
 - 지역: `country, region, regionName(서울·부산 등), visitors, pageViews`를 조회수 순으로, 위치를 알 수 없는 조회는 `unknownPageViews`로 따로 셉니다.
-- **접속자·지역은 프론트가 `POST /api/public/analytics/events`로 `PAGE_VIEW`를 보낼 때만 집계됩니다.** 위치는 프론트 호스팅(Vercel) 미들웨어가 `/api/*` 요청에 붙이는 `X-Chak-Geo-Country`, `X-Chak-Geo-Region` 값(국가·시도 코드)만 저장하며(없으면 `X-Vercel-IP-Country`, `X-Vercel-IP-Country-Region`을 대신 사용. Vercel은 외부 주소로 넘기는 rewrite에는 자기 헤더를 붙이지 않아 미들웨어가 필요함) **IP는 저장하지 않습니다.**
+- **접속자·지역은 프론트가 `POST /api/public/analytics/events`로 `PAGE_VIEW`를 보낼 때만 집계됩니다.** 위치는 프론트가 호스팅의 `/api/geo`(Vercel 함수)에서 받아 방문 기록 본문의 `geoCountry`(2자)·`geoRegion`(시·도 코드)에 실어 보낸 값을 씁니다. 요청 헤더에 위치가 있으면 헤더가 우선이며, 그 헤더는 프론트 호스팅 미들웨어가 `/api/*` 요청에 붙이는 `X-Chak-Geo-Country`, `X-Chak-Geo-Region` 값(국가·시도 코드)만 저장하며(없으면 `X-Vercel-IP-Country`, `X-Vercel-IP-Country-Region`을 대신 사용. Vercel은 외부 주소로 넘기는 rewrite에는 자기 헤더를 붙이지 않아 미들웨어가 필요함) **IP는 저장하지 않습니다.**
 
 ### 8.4 운영자 관리
 
