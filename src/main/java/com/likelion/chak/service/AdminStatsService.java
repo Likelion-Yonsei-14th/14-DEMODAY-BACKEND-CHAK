@@ -100,11 +100,17 @@ public class AdminStatsService {
         Map<Key, Long> views = new TreeMap<>(Comparator.comparing(Key::country, Comparator.nullsFirst(String::compareTo))
                 .thenComparing(Key::region, Comparator.nullsFirst(String::compareTo)));
         long unknown = 0;
+        long overseas = 0;
         for (Object[] row : trafficRepository.findPageViewsBetween(fromInstant, toInstant)) {
             String country = (String) row[3];
             String region = (String) row[4];
-            if (country == null && region == null) {
+            if (country == null) {
                 unknown++;
+                continue;
+            }
+            // 국내 서비스라 해외 접속은 지역 표에 넣지 않는다(건수만 따로 센다).
+            if (!"KR".equalsIgnoreCase(country)) {
+                overseas++;
                 continue;
             }
             Key key = new Key(country, region);
@@ -121,7 +127,7 @@ public class AdminStatsService {
                         visitors.getOrDefault(e.getKey(), Set.of()).size(), e.getValue()))
                 .sorted(Comparator.comparingLong(RegionStat::pageViews).reversed())
                 .toList();
-        return new RegionStatsResponse(start, end, items, unknown);
+        return new RegionStatsResponse(start, end, items, unknown, overseas);
     }
 
     private static void validate(LocalDate start, LocalDate end) {

@@ -115,6 +115,22 @@ class AdminStatsServiceTest {
     }
 
     @Test
+    void overseasVisitsAreLeftOutOfTheRegionTableAndCountedSeparately() {
+        LocalDate today = LocalDate.now(AdminStatsService.KST);
+        long before = statsService.regions(today, today).overseasPageViews();
+        analyticsService.record(null, guest(), pageView("/a"), new AnalyticsService.Geo("US", "CA"));
+        analyticsService.record(null, guest(), pageView("/a"), new AnalyticsService.Geo("JP", "13"));
+        analyticsService.record(null, guest(), pageView("/a"), new AnalyticsService.Geo("KR", "49"));
+
+        RegionStatsResponse regions = statsService.regions(today, today);
+
+        assertThat(regions.overseasPageViews() - before).isEqualTo(2);
+        assertThat(regions.items()).allMatch(i -> "KR".equals(i.country()));
+        assertThat(regions.items()).anyMatch(i -> "제주".equals(i.regionName()));
+        assertThat(regions.items()).noneMatch(i -> "CA".equals(i.regionName()));
+    }
+
+    @Test
     void regionNamesFallBackToTheRawCode() {
         assertThat(RegionNames.of("KR", "11")).isEqualTo("서울");
         assertThat(RegionNames.of("KR", "KR-41")).isEqualTo("경기");
