@@ -379,7 +379,7 @@ await fetch(`${API_URL}/api/public/desks/${supporterToken}/messages`, {
   "phone": "010-0000-0000", "message": "배너만 가능한지 궁금해요", "consent": true, "website": "" }
 ```
 
-- 필수는 `company`, `contactName`, `email`, `consent: true`입니다. `phone`(숫자·`+-() `만, 30자), `category`, `interest`(`PACKAGE`/`BANNER`/`OTHER`), `message`(2,000자)는 선택입니다.
+- 필수는 `company`, `contactName`, `email`, `consent: true`입니다. `phone`(숫자·`+-() `만, 30자), `category`, `interest`(`LOCAL_A`/`LOCAL_B`/`LOCAL_C`/`BRAND_S`/`BRAND_M`/`BRAND_L`/`ENTERPRISE`/`JOINT`/`OTHER`, 이전 제안서의 `PACKAGE`/`BANNER`는 기존 신청서 조회용으로만 남김), `message`(2,000자)는 선택입니다.
 - 응답은 `201 { "received": true }`입니다.
 - **`website`는 사람에게 보이지 않는 칸**입니다. 값이 있으면 자동 입력으로 보고 저장하지 않고 같은 `201`로 답합니다. 같은 회사·이메일의 24시간 안 재전송도 저장하지 않고 `201`로 답합니다.
 - 접속자(IP 해시)당 1시간 5건, 전체 1시간 60건을 넘으면 `429 TOO_MANY_EVENTS`입니다.
