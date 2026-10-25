@@ -35,7 +35,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
      */
     @org.springframework.data.jpa.repository.Query("""
             select user from UserAccount user
-            where (:state = 'ALL'
+            where user.provider <> :excludedProvider
+              and (:state = 'ALL'
                    or (:state = 'DELETED' and user.deletedAt is not null)
                    or (:state = 'ACTIVE' and user.deletedAt is null))
               and (:pattern = ''
@@ -45,6 +46,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
                    or user.id = :idValue)
             """)
     org.springframework.data.domain.Page<UserAccount> search(
+            @org.springframework.data.repository.query.Param("excludedProvider") AuthProvider excludedProvider,
             @org.springframework.data.repository.query.Param("state") String state,
             @org.springframework.data.repository.query.Param("pattern") String pattern,
             @org.springframework.data.repository.query.Param("idValue") long idValue,

@@ -1,6 +1,7 @@
 package com.likelion.chak.service;
 
 import com.likelion.chak.domain.AdminAuditLog;
+import com.likelion.chak.domain.AuthProvider;
 import com.likelion.chak.domain.ChaltteokWallet;
 import com.likelion.chak.domain.MessageStatus;
 import com.likelion.chak.domain.PersonalDesk;
@@ -60,7 +61,7 @@ public class AdminUserService {
         long idValue = trimmed.matches("^\\d{1,18}$") ? Long.parseLong(trimmed) : -1L;
         int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
         Page<UserAccount> result = userRepository.search(
-                normalizedState, pattern, idValue, PageRequest.of(Math.max(page, 0), safeSize,
+                AuthProvider.TEST, normalizedState, pattern, idValue, PageRequest.of(Math.max(page, 0), safeSize,
                         org.springframework.data.domain.Sort.by(
                                 org.springframework.data.domain.Sort.Order.desc("createdAt"),
                                 org.springframework.data.domain.Sort.Order.desc("id"))));
@@ -94,6 +95,9 @@ public class AdminUserService {
         UserAccount admin = find(adminId);
         UserAccount user = userRepository.findForUpdateById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        if (user.getProvider() == AuthProvider.TEST) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+        }
         if (user.isDeleted()) {
             return detail(userId);
         }
@@ -118,7 +122,12 @@ public class AdminUserService {
     }
 
     private UserAccount find(Long userId) {
-        return userRepository.findById(userId).orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        UserAccount user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        if (user.getProvider() == AuthProvider.TEST) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+        }
+        return user;
     }
 
     private static UserSummary summary(UserAccount user) {
