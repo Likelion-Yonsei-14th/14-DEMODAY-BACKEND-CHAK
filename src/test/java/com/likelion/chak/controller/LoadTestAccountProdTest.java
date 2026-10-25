@@ -9,6 +9,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
@@ -28,6 +29,9 @@ class LoadTestAccountProdTest {
                 .header("X-Chak-Load-Key", "01234567890123456789012345678901")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"runId\":\"load-prod\",\"count\":2}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/load-test/actual?date=2026-10-25")
+                .header("X-Chak-Load-Key", "01234567890123456789012345678901"))
                 .andExpect(status().isForbidden());
     }
 }

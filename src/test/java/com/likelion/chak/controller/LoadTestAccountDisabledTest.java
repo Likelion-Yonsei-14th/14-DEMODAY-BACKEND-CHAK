@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -22,6 +23,8 @@ class LoadTestAccountDisabledTest {
                 .header("X-Chak-Load-Key", "01234567890123456789012345678901")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"runId\":\"load-003\",\"count\":2}"))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/load-test/actual?date=2026-10-25"))
                 .andExpect(status().isNotFound());
     }
 }
