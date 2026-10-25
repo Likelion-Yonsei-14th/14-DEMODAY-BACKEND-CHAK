@@ -113,4 +113,19 @@ class DataRetentionServiceTest {
         jdbc.update("INSERT INTO minigame_rounds (public_id, game, answer_key, user_id, score, created_at, submitted_at) VALUES (?,?,?,?,?,?,?)",
                 UUID.randomUUID().toString(), "GUESS_GOD", "1234512345", userId, score, createdAt, score == null ? null : createdAt);
     }
+
+    @Test
+    void removesPushSubscriptionsThatNeverDeliveredForHalfAYear() {
+        long before = count("push_subscriptions");
+        String insert = "INSERT INTO push_subscriptions (endpoint, p256dh, auth, created_at, last_success_at, failure_count) VALUES (?,?,?,?,?,0)";
+        jdbc.update(insert, "https://fcm.googleapis.com/fcm/send/" + UUID.randomUUID(), "k", "a", daysAgo(300), null);          // 한 번도 전달 안 됨 → 삭제
+        jdbc.update(insert, "https://fcm.googleapis.com/fcm/send/" + UUID.randomUUID(), "k", "a", daysAgo(300), daysAgo(200)); // 마지막 전달이 오래됨 → 삭제
+        jdbc.update(insert, "https://fcm.googleapis.com/fcm/send/" + UUID.randomUUID(), "k", "a", daysAgo(300), daysAgo(10));  // 최근에 전달됨 → 유지
+        jdbc.update(insert, "https://fcm.googleapis.com/fcm/send/" + UUID.randomUUID(), "k", "a", daysAgo(5), null);           // 방금 구독 → 유지
+
+        int[] deleted = retention.purge();
+
+        assertThat(deleted[4]).isEqualTo(2);
+        assertThat(count("push_subscriptions")).isEqualTo(before + 2);
+    }
 }
