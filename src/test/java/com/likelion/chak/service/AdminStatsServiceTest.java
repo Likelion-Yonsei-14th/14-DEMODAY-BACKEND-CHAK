@@ -3,6 +3,7 @@ package com.likelion.chak.service;
 import com.likelion.chak.domain.GuestIdentity;
 import com.likelion.chak.domain.TrafficEventType;
 import com.likelion.chak.domain.UserAccount;
+import com.likelion.chak.domain.AuthProvider;
 import com.likelion.chak.dto.AdminDtos.DailyStat;
 import com.likelion.chak.dto.AdminDtos.DailyStatsResponse;
 import com.likelion.chak.dto.AdminDtos.RegionStatsResponse;
@@ -70,6 +71,19 @@ class AdminStatsServiceTest {
 
         assertThat(stats.days()).hasSize(3);
         assertThat(stats.days()).allSatisfy(d -> assertThat(d.visitors()).isZero());
+    }
+
+    @Test
+    void testAccountsDoNotIncreaseSignupOrUserStats() {
+        LocalDate today = LocalDate.now(AdminStatsService.KST);
+        DailyStatsResponse before = statsService.daily(today, today);
+        UserAccount testUser = userRepository.save(UserAccount.create(AuthProvider.TEST, "loadtest:" + UUID.randomUUID(), "부하시험", null, null));
+        analyticsService.record(testUser, null, pageView("/home"));
+        DailyStatsResponse after = statsService.daily(today, today);
+        assertThat(after.totalUsers()).isEqualTo(before.totalUsers());
+        assertThat(after.days().get(0).signups()).isEqualTo(before.days().get(0).signups());
+        assertThat(after.days().get(0).memberVisitors()).isEqualTo(before.days().get(0).memberVisitors());
+        assertThat(after.days().get(0).pageViews()).isEqualTo(before.days().get(0).pageViews());
     }
 
     @Test
