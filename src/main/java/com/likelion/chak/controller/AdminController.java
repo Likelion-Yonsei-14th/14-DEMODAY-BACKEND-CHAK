@@ -55,6 +55,7 @@ public class AdminController {
     private final ReportAdminService reportAdminService;
     private final AdminUserService adminUserService;
     private final AdminStatsService adminStatsService;
+    private final com.likelion.chak.service.AdminMinigameStatsService adminMinigameStatsService;
     private final AdminAccessService adminAccessService;
     private final com.likelion.chak.service.PromotionInquiryService promotionInquiryService;
 
@@ -174,6 +175,13 @@ public class AdminController {
             @RequestParam(name = "to", required = false) java.time.LocalDate to) {
         authService.getAdmin(principal.userId());
         return ResponseEntity.ok(adminStatsService.regions(from, to));
+    }
+
+    @GetMapping("/minigames/stats")
+    public ResponseEntity<com.likelion.chak.dto.AdminDtos.MinigameStatsResponse> getMinigameStats(
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adminMinigameStatsService.stats());
     }
 
     @GetMapping("/admins")
