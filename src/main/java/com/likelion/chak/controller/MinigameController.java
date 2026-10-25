@@ -4,6 +4,8 @@ import com.likelion.chak.alert.MinigameRateLimiter;
 import com.likelion.chak.alert.MinigameRateLimiter.Action;
 import com.likelion.chak.config.AuthenticatedUser;
 import com.likelion.chak.domain.UserAccount;
+import com.likelion.chak.dto.MinigameDtos.D1CourseReceived;
+import com.likelion.chak.dto.MinigameDtos.D1CourseRequest;
 import com.likelion.chak.dto.MinigameDtos.Leaderboard;
 import com.likelion.chak.dto.MinigameDtos.RoundCreated;
 import com.likelion.chak.dto.MinigameDtos.SneakyPhoneBoard;
@@ -17,6 +19,7 @@ import com.likelion.chak.dto.MinigameDtos.SubmitResult;
 import com.likelion.chak.exception.CustomException;
 import com.likelion.chak.exception.ErrorCode;
 import com.likelion.chak.service.AuthService;
+import com.likelion.chak.service.D1CourseService;
 import com.likelion.chak.service.GuessGodService;
 import com.likelion.chak.service.SneakyPhoneService;
 import com.likelion.chak.service.StudyTypeService;
@@ -45,6 +48,7 @@ public class MinigameController {
     private final GuessGodService guessGodService;
     private final SneakyPhoneService sneakyPhoneService;
     private final StudyTypeService studyTypeService;
+    private final D1CourseService d1CourseService;
     private final AuthService authService;
     private final MinigameRateLimiter rateLimiter;
 
@@ -96,6 +100,17 @@ public class MinigameController {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
         return ResponseEntity.ok(sneakyPhoneService.leaderboard(period, viewer(principal)));
+    }
+
+    /** 로그인 없이, 계정과 연결하지 않고 받는다. 새 응답은 201, 같은 응답을 다시 받으면 200. */
+    @PostMapping("/d1-course/responses")
+    public ResponseEntity<D1CourseReceived> recordD1Course(
+            @Valid @RequestBody D1CourseRequest request, HttpServletRequest http) {
+        if (!rateLimiter.tryAcquire(Action.D1_COURSE_RESPONSE, "ip" + ClientIp.of(http))) {
+            throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
+        }
+        boolean created = d1CourseService.record(request);
+        return ResponseEntity.status(created ? HttpStatus.CREATED : HttpStatus.OK).body(new D1CourseReceived(true));
     }
 
     @PostMapping("/study-type/results")

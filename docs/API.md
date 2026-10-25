@@ -840,6 +840,24 @@ S3 버킷은 프론트 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허
 
 결과 화면에 들어올 때마다가 아니라 **테스트를 끝낸 순간 한 번만** 기록해 주세요. 회원은 다시 해도 한 줄만 남고 유형이 바뀌며, 비회원은 기록할 때마다 한 줄씩 늘어납니다(참고용 통계입니다).
 
+**수능 끝 D+1 코스 짜기**
+
+게임이 끝났을 때 한 번 보내는 응답입니다. **통계용으로만** 쓰며 이름·연락처·계정·IP를 저장하지 않습니다(로그인 토큰 없이 보내고, 보내도 연결하지 않습니다).
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| POST | `/api/public/minigames/d1-course/responses` | 응답 저장. 새 응답은 `201`, 같은 응답을 다시 보내면 `200` |
+
+```json
+{ "responseId": "…uuid(판마다 난수)…", "startRegion": "gyeonggi", "startDistrict": "고양시",
+  "area": "hongdae", "activities": ["dye", "lens", "food"], "companion": "small", "budget": "30kTo100k", "shared": false }
+// → { "received": true }
+```
+
+- 선택지 id는 프런트 `d1CourseConfig.ts`·`d1CourseRegions.ts`와 같습니다. `startRegion`은 17개 시·도 id, `startDistrict`는 한글 이름(10자 이내, 세종은 `null`), `area`·`companion`·`budget`은 정해진 id, `activities`는 서로 다른 활동 id **정확히 3개**입니다. 모르는 id나 형식이 틀리면 `400 INVALID_D1_COURSE_RESPONSE`(또는 형식 검증 `400`)입니다. **프런트에 선택지를 추가하면 백엔드(`D1CourseService`)도 같이 늘려야 합니다.**
+- `responseId`가 같으면 같은 응답으로 보고 **`shared`만 `true`로 올립니다**(공유 버튼을 누른 뒤 한 번 더 보냄). 답 내용은 처음 받은 그대로이고 `shared`는 다시 내려가지 않습니다.
+- 같은 IP는 시간당 60건을 넘으면 `429 TOO_MANY_EVENTS`입니다.
+
 **랭킹 닉네임** (로그인 필수)
 
 | 메서드 | 경로 | 설명 |
@@ -1000,6 +1018,11 @@ GET /api/admin/minigames/stats
   "studyType": {
     "total": 1520, "members": 210, "today": 33, "last7Days": 240,
     "distribution": [{ "code": "PSA", "count": 210, "percent": 13.8 }]
+  },
+  "d1Course": {                         // D+1 코스 짜기
+    "total": 480, "today": 20, "last7Days": 310, "shared": 96,
+    "areas": [{ "key": "hongdae", "count": 130 }],         // 많은 순. 활동은 한 응답이 3개를 고르므로 합이 응답 수의 3배
+    "activities": [{ "key": "food", "count": 300 }], "companions": [], "budgets": [], "regions": []
   }
 }
 ```
@@ -1232,6 +1255,7 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 | 400 | `INVALID_MINIGAME_RESULT` | 폰 게임 결과가 규칙·시간 검사에 맞지 않음 |
 | 400 | `INVALID_MINIGAME_ANSWERS` | 답 개수가 문항 수와 다르거나 1~5가 아님 |
 | 400 | `INVALID_NICKNAME` | 닉네임 형식 오류 |
+| 400 | `INVALID_D1_COURSE_RESPONSE` | D+1 코스 응답에 모르는 선택지·잘못된 조합 |
 | 400 | `NICKNAME_NOT_ALLOWED` | 금칙어가 들어 있는 닉네임 |
 | 405 | `METHOD_NOT_ALLOWED` | 지원하지 않는 HTTP 메서드 |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | `application/json`이 아닌 Content-Type |

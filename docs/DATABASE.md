@@ -17,6 +17,7 @@
 | V8 | users: `kakao_id` → `provider` + `provider_user_id`, 유일 제약을 (provider, provider_user_id)로 변경 (기존 회원은 모두 KAKAO) |
 | V12 | promotion_inquiries(광고 상담 신청, 1년 뒤 삭제) |
 | V13 | minigame_rounds(찍신 한 판), minigame_profiles(랭킹 닉네임), study_type_results(유형 테스트 결과) |
+| V14 | d1_course_responses(D+1 코스 짜기 응답, 통계용) |
 | V11 | personal_desks `claim_token`(넘겨받기 링크, UNIQUE)·`claimed_at`·`deleted_at`(삭제 표시) |
 | V10 | admin_invites(이메일로 운영자 권한 초대, 최초 운영자 시드) |
 | V9 | users `last_login_at`·`deleted_at`(탈퇴 익명화), traffic_events `country`·`region`(접속 지역, IP 미저장), admin_audit_logs |
@@ -306,3 +307,8 @@ UNIQUE `(advertisement_id, event_type, session_id)` — 재시도 중복 방지.
   랭킹은 이 표에서 회원별 최고 점수를 묶어 계산합니다. 정리 배치가 제출하지 않고 2일 지난 판과 비회원이 제출하고 30일 지난 판을 지우고, 회원의 기록은 남깁니다.
 - `minigame_profiles`: `user_id`(PK), `nickname`, `updated_at`. 회원 탈퇴 처리 때 지웁니다.
 - `study_type_results`: `code`(`PSA` 등 8개), `user_id`(고유, 비회원은 비어 있음), `created_at`. 회원은 한 줄을 덮어씁니다.
+
+## D+1 코스 짜기 응답 (V14)
+
+- `d1_course_responses`: `response_id`(브라우저가 판마다 만드는 난수·고유), `start_region`(시·도 id), `start_district`(한글 이름, 세종은 비어 있음), `area`, `activity1`~`activity3`(고른 순서), `companion`, `budget`, `shared`, `created_at`, `updated_at`. 인덱스 `created_at`.
+- **계정·IP·이름을 저장하는 열이 없습니다.** 통계(어느 지역 수험생이 무엇을 하고 싶어 하는지)에만 씁니다. 같은 `response_id`가 다시 오면 `shared`만 올립니다.
