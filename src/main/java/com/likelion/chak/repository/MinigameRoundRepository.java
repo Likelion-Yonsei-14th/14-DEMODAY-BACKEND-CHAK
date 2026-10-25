@@ -59,4 +59,19 @@ public interface MinigameRoundRepository extends JpaRepository<MinigameRound, Lo
             where r.game = :game and r.score is not null and r.submittedAt >= :since
             group by r.score""")
     List<ScoreCount> distribution(@Param("game") MinigameType game, @Param("since") Instant since);
+
+    /** 기간 안에 제출한 판의 (제출 시각, 점수, 회원 번호 또는 null). 어드민 통계가 자바에서 날짜별로 묶는다. */
+    @Query("""
+            select r.submittedAt, r.score, u.id
+            from MinigameRound r left join r.user u
+            where r.game = :game and r.score is not null and r.submittedAt >= :since""")
+    List<Object[]> submissionsSince(@Param("game") MinigameType game, @Param("since") Instant since);
+
+    long countByGameAndCreatedAtGreaterThanEqual(MinigameType game, Instant since);
+
+    @Query("select count(distinct r.user.id) from MinigameRound r where r.game = :game and r.score is not null and r.user is not null")
+    long countRankedMembers(@Param("game") MinigameType game);
+
+    @Query("select max(r.score) from MinigameRound r where r.game = :game and r.score is not null and r.user is not null")
+    Integer bestMemberScore(@Param("game") MinigameType game);
 }

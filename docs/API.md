@@ -980,6 +980,33 @@ DELETE /api/admin/admins/invites/{inviteId}    대기 중인 초대 취소
 - 최초 운영자는 마이그레이션(V10)이 `mj0324@yonsei.ac.kr` 초대를 심어 둡니다.
 - 모든 작업은 `admin_audit_logs`에 남습니다(`GRANT_ADMIN`, `INVITE_ADMIN`, `REVOKE_ADMIN`, `CANCEL_ADMIN_INVITE`).
 
+### 8.5 미니게임 참여 통계
+
+```text
+GET /api/admin/minigames/stats
+```
+
+```json
+{
+  "games": [{
+    "game": "GUESS_GOD",                 // 또는 SNEAKY_PHONE
+    "startedToday": 120, "submittedToday": 96,       // 오늘 판을 받은 수 / 끝까지 제출한 수
+    "submittedLast7Days": 540, "submittedLast14Days": 980,
+    "averageScoreLast14Days": 3.1,        // 기록이 없으면 null
+    "rankedMembers": 41, "bestMemberScore": 9,       // 지금까지 랭킹에 오른 회원 수 / 회원 최고 점수
+    "days": [{ "date": "2026-10-12", "members": 14, "guests": 52 }]   // 최근 14일(한국 시간), 제출 기준
+  }],
+  "studyType": {
+    "total": 1520, "members": 210, "today": 33, "last7Days": 240,
+    "distribution": [{ "code": "PSA", "count": 210, "percent": 13.8 }]
+  }
+}
+```
+
+- 운영자만 호출할 수 있습니다. 규모가 작아 행을 읽어 자바에서 집계합니다.
+- 비회원이 제출한 판은 정리 배치가 30일 뒤, 제출하지 않은 판은 2일 뒤 지우므로 일별 표는 최근 14일만 줍니다. `startedToday − submittedToday`가 오늘 중간에 그만둔 판입니다.
+- `rankedMembers`·`bestMemberScore`는 탈퇴한 회원의 기록도 포함합니다(랭킹 화면에서는 빠집니다).
+
 ## 9. 보낸 응원·반응·신고 (작성자·방문자)
 
 모두 `/api/public/**`이며 로그인은 선택입니다. 회원은 Bearer, 비회원은 `chak_guest_id` 쿠키(`credentials: "include"`)로 본인을 식별합니다. 신원을 확인할 수 없으면 `401 IDENTITY_REQUIRED`(조회 API는 빈 결과)입니다.

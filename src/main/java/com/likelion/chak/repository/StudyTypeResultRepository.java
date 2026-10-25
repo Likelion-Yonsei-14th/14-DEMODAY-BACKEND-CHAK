@@ -19,4 +19,8 @@ public interface StudyTypeResultRepository extends JpaRepository<StudyTypeResult
 
     @Query("select s.code as code, count(s) as count from StudyTypeResult s group by s.code")
     List<CodeCount> countByCode();
+
+    long countByUserIsNotNull();
+
+    long countByCreatedAtGreaterThanEqual(java.time.Instant since);
 }
