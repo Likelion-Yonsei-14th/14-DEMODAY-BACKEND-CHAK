@@ -224,10 +224,29 @@ https://accounts.google.com/o/oauth2/v2/auth
   "id": 1,
   "displayName": "민준",
   "email": "user@example.com",
-  "profileImageUrl": "https://...",
-  "admin": false
+  "profileImageUrl": "https://...",      // 카카오·구글이 준 사진 주소(바뀌지 않음)
+  "admin": false,
+  "provider": "GOOGLE",
+  "avatarUrl": "/api/public/avatars/…"   // 직접 올린 프로필 사진. 올리지 않았으면 null
 }
 ```
+
+로그인·재발급 응답의 `user`도 같은 모양(`avatarUrl` 포함)입니다.
+
+### 3.5 내 이름·프로필 사진 바꾸기
+
+인증: 필수. 응답은 모두 바뀐 `UserResponse`(3.4와 같은 모양)이고, 변경은 회원 한 명이 시간당 20번까지입니다(넘으면 `429 TOO_MANY_EVENTS`).
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| PATCH | `/api/users/me` | `{ "displayName": "새 이름" }` — 앞뒤 공백을 지운 1~20자, 한글·영문·숫자·공백·`.`·`_`·`-`·`()`만. 욕설·위험 단어는 `400 NICKNAME_NOT_ALLOWED`, 형식 오류는 `400 INVALID_DISPLAY_NAME` |
+| PUT | `/api/users/me/avatar` | `{ "image": "data:image/jpeg;base64,…" }` — JPEG·PNG·WebP, 풀어서 150KB 이하. 실제 파일 첫 바이트가 선언과 다르거나 SVG 등이면 `400 INVALID_AVATAR` |
+| DELETE | `/api/users/me/avatar` | 올린 사진을 지움 |
+| GET | `/api/public/avatars/{avatarKey}` | 사진 파일. **로그인 없이** 읽을 수 있어 `<img src>`에 쓰고, 주소(키)가 올릴 때마다 새로 만드는 난수라서 아는 사람만 볼 수 있습니다. 없으면 `404 AVATAR_NOT_FOUND`. 1년 캐시(`immutable`) |
+
+- **직접 고친 이름은 다음 로그인 때 카카오·구글 이름으로 덮어쓰지 않습니다.** 이메일과 `profileImageUrl`은 계속 제공자를 따릅니다.
+- 사진을 바꾸면 주소도 바뀌므로 브라우저는 새 사진을 받습니다. 회원 탈퇴 처리 때 사진은 함께 삭제됩니다.
+- `avatarUrl`은 같은 서버의 상대 경로입니다(프런트는 API 주소를 앞에 붙여 씁니다).
 
 ## 4. 공개 책상 API
 
@@ -1255,6 +1274,9 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 | 400 | `INVALID_MINIGAME_RESULT` | 폰 게임 결과가 규칙·시간 검사에 맞지 않음 |
 | 400 | `INVALID_MINIGAME_ANSWERS` | 답 개수가 문항 수와 다르거나 1~5가 아님 |
 | 400 | `INVALID_NICKNAME` | 닉네임 형식 오류 |
+| 400 | `INVALID_DISPLAY_NAME` | 프로필 이름 형식 오류 |
+| 400 | `INVALID_AVATAR` | 프로필 사진 형식·크기·내용 오류 |
+| 404 | `AVATAR_NOT_FOUND` | 프로필 사진을 찾을 수 없음 |
 | 400 | `INVALID_D1_COURSE_RESPONSE` | D+1 코스 응답에 모르는 선택지·잘못된 조합 |
 | 400 | `NICKNAME_NOT_ALLOWED` | 금칙어가 들어 있는 닉네임 |
 | 405 | `METHOD_NOT_ALLOWED` | 지원하지 않는 HTTP 메서드 |

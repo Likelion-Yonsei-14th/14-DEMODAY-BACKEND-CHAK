@@ -46,6 +46,10 @@ public class UserAccount {
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean admin;
 
+    /** 회원이 이름을 직접 고쳤는지. 그러면 다음 로그인에서 카카오·구글 이름으로 덮어쓰지 않는다. */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean profileCustomized;
+
     private Instant lastLoginAt;
 
     /** 탈퇴 처리한 시각. 값이 있으면 개인정보를 지운 익명 계정이다(행은 장부·응원의 FK 때문에 남긴다). */
@@ -91,10 +95,19 @@ public class UserAccount {
         return create(AuthProvider.GOOGLE, googleId, displayName, email, profileImageUrl);
     }
 
+    /** 로그인할 때 카카오·구글에서 받은 정보를 반영한다. 직접 고친 이름은 그대로 둔다. */
     public void updateProfile(String displayName, String email, String profileImageUrl) {
-        this.displayName = displayName;
+        if (!profileCustomized) {
+            this.displayName = displayName;
+        }
         this.email = email;
         this.profileImageUrl = profileImageUrl;
+    }
+
+    /** 회원이 직접 이름을 고쳤다. */
+    public void editDisplayName(String displayName) {
+        this.displayName = displayName;
+        this.profileCustomized = true;
     }
 
     public static final String WITHDRAWN_NAME = "탈퇴한 사용자";
@@ -116,6 +129,7 @@ public class UserAccount {
         this.email = null;
         this.profileImageUrl = null;
         this.admin = false;
+        this.profileCustomized = false;
         this.providerUserId = "deleted:" + id;
         this.deletedAt = at;
     }
