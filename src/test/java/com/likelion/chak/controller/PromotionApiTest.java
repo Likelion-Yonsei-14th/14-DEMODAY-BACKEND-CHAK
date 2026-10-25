@@ -59,6 +59,24 @@ class PromotionApiTest {
     }
 
     @Test
+    void everyProductInterestOnTheFormIsAccepted() throws Exception {
+        String[] interests = {"LOCAL_A", "LOCAL_B", "LOCAL_C", "BRAND_S", "BRAND_M", "BRAND_L", "ENTERPRISE", "JOINT", "OTHER"};
+        for (String interest : interests) {
+            String company = "관심" + unique();
+            String json = "{\"company\":\"" + company + "\",\"contactName\":\"박담당\",\"email\":\"i@example.com\",\"interest\":\"" + interest + "\",\"consent\":true}";
+            mockMvc.perform(submit(json, "10.7." + (int) (Math.random() * 200) + "." + (int) (Math.random() * 200))).andExpect(status().isCreated());
+            var saved = repository.findAll().stream().filter(i -> i.getCompany().equals(company)).findFirst().orElseThrow();
+            assertThat(saved.getInterest().name()).isEqualTo(interest);
+        }
+    }
+
+    @Test
+    void unknownInterestIsRejected() throws Exception {
+        String json = "{\"company\":\"모름\",\"contactName\":\"박담당\",\"email\":\"i@example.com\",\"interest\":\"GOLD\",\"consent\":true}";
+        mockMvc.perform(submit(json, "10.8.0.1")).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void onlyCompanyContactAndEmailAreRequired() throws Exception {
         String company = "간단" + unique();
         String minimal = "{\"company\":\"" + company + "\",\"contactName\":\"박담당\",\"email\":\"min@example.com\",\"consent\":true}";

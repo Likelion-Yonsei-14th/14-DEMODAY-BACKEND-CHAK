@@ -14,7 +14,11 @@ import java.time.Instant;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PromotionInquiry {
 
-    public enum Interest { PACKAGE, BANNER, OTHER }
+    /**
+     * 상담 신청서에서 고른 관심 상품. 매장 한 곳은 A/B/C, 여러 지점은 Brand S/M/L/Enterprise, 혜택·경품은 JOINT.
+     * PACKAGE·BANNER는 이전 제안서(대형 브랜드 패키지)에서 받은 기존 신청서를 위해 남겨 둔다.
+     */
+    public enum Interest { LOCAL_A, LOCAL_B, LOCAL_C, BRAND_S, BRAND_M, BRAND_L, ENTERPRISE, JOINT, OTHER, PACKAGE, BANNER }
 
     public enum Status { NEW, CONTACTED, CLOSED }
 
