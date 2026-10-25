@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/kakao", "/api/auth/google", "/api/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/load-test/accounts").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/load-test/actual").permitAll()
                         .requestMatchers("/api/public/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(exception -> exception

@@ -28,6 +28,20 @@ class LoadTestAccountControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"runId\":\"load-001\",\"count\":2}"))
                 .andExpect(status().isForbidden());
+        mvc.perform(get("/api/load-test/actual?date=2026-10-25"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void readsDailyActualsWithProvisionKey() throws Exception {
+        String today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).toString();
+        mvc.perform(get("/api/load-test/actual")
+                        .param("date", today)
+                        .header("X-Chak-Load-Key", "01234567890123456789012345678901"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.date").value(today))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.members").isNumber())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.guests").isNumber());
     }
 
     @Test
