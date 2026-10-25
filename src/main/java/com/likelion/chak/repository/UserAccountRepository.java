@@ -12,6 +12,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
 
     long countByDeletedAtIsNull();
 
+    long countByDeletedAtIsNullAndProviderNot(AuthProvider provider);
+
     java.util.List<UserAccount> findAllByAdminTrueAndDeletedAtIsNullOrderByCreatedAtAsc();
 
     java.util.List<UserAccount> findAllByProviderAndEmailIgnoreCaseAndDeletedAtIsNull(AuthProvider provider, String email);
@@ -20,6 +22,12 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     java.util.List<java.time.Instant> findCreatedAtBetween(
             @org.springframework.data.repository.query.Param("from") java.time.Instant from,
             @org.springframework.data.repository.query.Param("to") java.time.Instant to);
+
+    @org.springframework.data.jpa.repository.Query("select user.createdAt from UserAccount user where user.createdAt >= :from and user.createdAt < :to and user.provider <> :excludedProvider")
+    java.util.List<java.time.Instant> findCreatedAtBetweenExcludingProvider(
+            @org.springframework.data.repository.query.Param("from") java.time.Instant from,
+            @org.springframework.data.repository.query.Param("to") java.time.Instant to,
+            @org.springframework.data.repository.query.Param("excludedProvider") AuthProvider excludedProvider);
 
     /**
      * 회원 검색. state는 ACTIVE(탈퇴 안 함) / DELETED(탈퇴) / ALL, pattern은 소문자 like 패턴(없으면 빈 문자열),

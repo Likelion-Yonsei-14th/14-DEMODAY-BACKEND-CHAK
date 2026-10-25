@@ -5,6 +5,7 @@ import com.likelion.chak.dto.AdminDtos.DailyStatsResponse;
 import com.likelion.chak.dto.AdminDtos.RegionStat;
 import com.likelion.chak.dto.AdminDtos.RegionStatsResponse;
 import com.likelion.chak.domain.MessageStatus;
+import com.likelion.chak.domain.AuthProvider;
 import com.likelion.chak.exception.CustomException;
 import com.likelion.chak.exception.ErrorCode;
 import com.likelion.chak.repository.ChaltteokChargeRepository;
@@ -53,7 +54,7 @@ public class AdminStatsService {
         Map<LocalDate, Set<Long>> members = new HashMap<>();
         Map<LocalDate, Set<Long>> guests = new HashMap<>();
         Map<LocalDate, Long> views = new HashMap<>();
-        for (Object[] row : trafficRepository.findPageViewsBetween(fromInstant, toInstant)) {
+        for (Object[] row : trafficRepository.findPageViewsBetween(fromInstant, toInstant, AuthProvider.TEST)) {
             LocalDate day = day((Instant) row[0]);
             views.merge(day, 1L, Long::sum);
             if (row[1] != null) {
@@ -62,7 +63,7 @@ public class AdminStatsService {
                 guests.computeIfAbsent(day, k -> new HashSet<>()).add((Long) row[2]);
             }
         }
-        Map<LocalDate, Long> signups = countByDay(userRepository.findCreatedAtBetween(fromInstant, toInstant));
+        Map<LocalDate, Long> signups = countByDay(userRepository.findCreatedAtBetweenExcludingProvider(fromInstant, toInstant, AuthProvider.TEST));
         Map<LocalDate, Long> desks = countByDay(deskRepository.findCreatedAtBetween(fromInstant, toInstant));
         Map<LocalDate, Long> messages = countByDay(messageRepository.findCreatedAtBetween(fromInstant, toInstant));
         Map<LocalDate, Long> charges = new HashMap<>();
@@ -78,7 +79,7 @@ public class AdminStatsService {
                     views.getOrDefault(day, 0L), signups.getOrDefault(day, 0L), desks.getOrDefault(day, 0L),
                     messages.getOrDefault(day, 0L), charges.getOrDefault(day, 0L)));
         }
-        return new DailyStatsResponse(start, end, userRepository.countByDeletedAtIsNull(), deskRepository.count(),
+        return new DailyStatsResponse(start, end, userRepository.countByDeletedAtIsNullAndProviderNot(AuthProvider.TEST), deskRepository.count(),
                 messageRepository.countByStatusNot(MessageStatus.DELETED), days);
     }
 
@@ -96,7 +97,7 @@ public class AdminStatsService {
         Map<Key, Long> views = new TreeMap<>(Comparator.comparing(Key::country, Comparator.nullsFirst(String::compareTo))
                 .thenComparing(Key::region, Comparator.nullsFirst(String::compareTo)));
         long unknown = 0;
-        for (Object[] row : trafficRepository.findPageViewsBetween(fromInstant, toInstant)) {
+        for (Object[] row : trafficRepository.findPageViewsBetween(fromInstant, toInstant, AuthProvider.TEST)) {
             String country = (String) row[3];
             String region = (String) row[4];
             if (country == null && region == null) {

@@ -1,6 +1,7 @@
 package com.likelion.chak.repository;
 
 import com.likelion.chak.domain.TrafficEvent;
+import com.likelion.chak.domain.AuthProvider;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -46,10 +47,13 @@ public interface TrafficEventRepository extends JpaRepository<TrafficEvent, Long
     @Query("""
             select event.createdAt, event.user.id, event.guest.id, event.country, event.region
             from TrafficEvent event
+            left join event.user member
             where event.eventType = com.likelion.chak.domain.TrafficEventType.PAGE_VIEW
               and event.createdAt >= :from and event.createdAt < :to
+              and (member.id is null or member.provider <> :excludedProvider)
             """)
-    List<Object[]> findPageViewsBetween(@Param("from") Instant from, @Param("to") Instant to);
+    List<Object[]> findPageViewsBetween(@Param("from") Instant from, @Param("to") Instant to,
+                                        @Param("excludedProvider") AuthProvider excludedProvider);
 
     @Query("""
             select event.eventType, count(event)

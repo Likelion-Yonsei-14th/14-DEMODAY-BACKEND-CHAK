@@ -30,6 +30,8 @@
 
 교실 단위 응원은 Post-MVP 범위이며 구현하지 않았습니다.
 
+부하 시험에는 `loadtest` 또는 `prod` 프로필에서 `/api/load-test/accounts`를 사용할 수 있습니다. 운영 서버에서는 32자 이상의 `LOAD_TEST_PROVISION_KEY`를 설정해야 시험 회원과 JWT·리프레시 토큰이 발급되며, 키가 없으면 403을 반환합니다. 시험 계정은 `TEST` 제공자로 구분됩니다. 실행 절차는 `../chak-sim/README.md`를 참고하세요.
+
 ## Tech
 
 - Java 17
