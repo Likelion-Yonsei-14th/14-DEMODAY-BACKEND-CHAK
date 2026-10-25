@@ -8,6 +8,7 @@ import com.likelion.chak.dto.UserResponse;
 import com.likelion.chak.exception.CustomException;
 import com.likelion.chak.exception.ErrorCode;
 import com.likelion.chak.repository.RefreshTokenRepository;
+import com.likelion.chak.repository.UserAvatarRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class TokenService {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserAvatarRepository userAvatarRepository;
 
     @Value("${jwt.refresh-token-expiration-seconds}")
     private long refreshTokenExpirationSeconds;
@@ -79,7 +81,7 @@ public class TokenService {
                 refreshToken,
                 "Bearer",
                 jwtTokenProvider.getAccessTokenExpirationSeconds(),
-                UserResponse.from(user));
+                UserResponse.from(user, userAvatarRepository.findKeyByUserId(user.getId()).orElse(null)));
     }
 
     private String createRandomToken() {

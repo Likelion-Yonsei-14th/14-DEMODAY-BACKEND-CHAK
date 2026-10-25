@@ -36,7 +36,9 @@ public class PublicWriteLimiter {
         DESK_MESSAGE_HOUR(300, HOUR_MS),
         DESK_MESSAGE_DAY(1_500, DAY_MS),
         REPORT(30, HOUR_MS),
-        ORDER(20, HOUR_MS);
+        ORDER(20, HOUR_MS),
+        /** 프로필 이름·사진 변경: 회원 한 명이 시간당 20번. */
+        PROFILE_UPDATE(20, HOUR_MS);
 
         final int limit;
         final long windowMs;
