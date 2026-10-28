@@ -45,7 +45,7 @@ public class LoadTestAccountController {
 
     public record ProvisionRequest(String runId, int count) {}
     public record ProvisionedAccount(long userId, String accessToken, String refreshToken, long expiresIn) {}
-    public record ActualVisitors(LocalDate date, long members, long guests) {}
+    public record ActualVisitors(LocalDate date, long members, long guests, long naturalMembers, long naturalGuests) {}
     public record RegionCount(String region, String trafficType, long visits) {}
     public record RegionLoad(LocalDate date, List<RegionCount> regions) {}
 
@@ -68,8 +68,10 @@ public class LoadTestAccountController {
             @RequestParam("date") LocalDate date) {
         if (!authorized(providedKey)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         var day = stats.daily(date, date).days().get(0);
+        var natural = stats.naturalDaily(date);
         return ResponseEntity.ok().header("Cache-Control", "no-store")
-                .body(new ActualVisitors(date, day.memberVisitors(), day.guestVisitors()));
+                .body(new ActualVisitors(date, day.memberVisitors(), day.guestVisitors(),
+                        natural.members(), natural.guests()));
     }
 
     @PostMapping("/accounts")

@@ -86,6 +86,23 @@ public class AdminStatsService {
                 messageRepository.countByStatusNot(MessageStatus.DELETED), days);
     }
 
+    /** Distinct visitors excluding marked load-test visits and TEST accounts. */
+    @Transactional(readOnly = true)
+    public NaturalVisitors naturalDaily(LocalDate date) {
+        Instant start = date.atStartOfDay(KST).toInstant();
+        Instant end = date.plusDays(1).atStartOfDay(KST).toInstant();
+        Set<Long> members = new HashSet<>();
+        Set<String> guests = new HashSet<>();
+        for (Object[] row : trafficRepository.findPageViewsBetween(start, end)) {
+            if (row[7] == AuthProvider.TEST || isLoadTestGuest(row)) continue;
+            if (row[1] != null) members.add((Long) row[1]);
+            else if (row[2] != null) guests.add(String.valueOf(row[2]));
+        }
+        return new NaturalVisitors(members.size(), guests.size());
+    }
+
+    public record NaturalVisitors(long members, long guests) {}
+
     @Transactional(readOnly = true)
     public RegionStatsResponse regions(LocalDate from, LocalDate to) {
         LocalDate end = to == null ? LocalDate.now(KST) : to;
