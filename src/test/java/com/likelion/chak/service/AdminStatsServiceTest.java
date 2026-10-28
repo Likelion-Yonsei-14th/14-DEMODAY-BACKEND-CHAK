@@ -105,6 +105,22 @@ class AdminStatsServiceTest {
     }
 
     @Test
+    void naturalDailyExcludesTestAccountsAndMarkedGuestVisits() {
+        LocalDate today = LocalDate.now(AdminStatsService.KST);
+        var before = statsService.naturalDaily(today);
+        UserAccount natural = userRepository.save(UserAccount.createKakao("k-" + UUID.randomUUID(), "회원", null, null));
+        UserAccount test = userRepository.save(UserAccount.create(AuthProvider.TEST, "loadtest:" + UUID.randomUUID(), "부하시험", null, null));
+        analyticsService.record(natural, null, pageView("/"));
+        analyticsService.record(test, null, pageView("/"));
+        analyticsService.record(null, guest(), pageView("/"));
+        analyticsService.record(null, guest(), new TrafficEventRequest(UUID.randomUUID().toString(),
+                TrafficEventType.PAGE_VIEW, "test-session", "/", null, "LOAD_TEST_GUEST", null, null));
+        var after = statsService.naturalDaily(today);
+        assertThat(after.members()).isEqualTo(before.members() + 1);
+        assertThat(after.guests()).isEqualTo(before.guests() + 1);
+    }
+
+    @Test
     void rangesAreValidated() {
         LocalDate today = LocalDate.now(AdminStatsService.KST);
         assertThatThrownBy(() -> statsService.daily(today, today.minusDays(1))).isInstanceOf(CustomException.class);
