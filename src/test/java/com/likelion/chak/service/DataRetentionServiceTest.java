@@ -94,6 +94,19 @@ class DataRetentionServiceTest {
     }
 
     @Test
+    void removesBenefitSubmissionsOlderThanAYear() {
+        long before = count("benefit_submissions");
+        String insert = "INSERT INTO benefit_submissions (brand, category, contact_name, email, phone, headline, answers, status, created_at) VALUES (?,?,?,?,?,?,?,?,?)";
+        jdbc.update(insert, "오래된브랜드", "CAFE", "담당", "old@example.com", "010-0000-0000", "문구", "{}", "NEW", daysAgo(400));
+        jdbc.update(insert, "최근브랜드", "CAFE", "담당", "new@example.com", "010-0000-0000", "문구", "{}", "NEW", daysAgo(30));
+
+        int[] deleted = retention.purge();
+
+        assertThat(deleted[2]).isEqualTo(1);
+        assertThat(count("benefit_submissions")).isEqualTo(before + 1);
+    }
+
+    @Test
     void removesAbandonedAndGuestMinigameRoundsButKeepsMemberScores() {
         long u = user();
         long before = count("minigame_rounds");
