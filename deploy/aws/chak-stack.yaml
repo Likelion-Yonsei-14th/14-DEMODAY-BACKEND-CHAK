@@ -129,6 +129,10 @@ Resources:
             Status: Enabled
             Prefix: tmp/
             ExpirationInDays: 1
+          - Id: expire-benefit-uploads
+            Status: Enabled
+            Prefix: promotion/uploads/
+            ExpirationInDays: 365
           - Id: abort-incomplete-multipart
             Status: Enabled
             AbortIncompleteMultipartUpload:

@@ -58,6 +58,7 @@ public class AdminController {
     private final com.likelion.chak.service.AdminMinigameStatsService adminMinigameStatsService;
     private final AdminAccessService adminAccessService;
     private final com.likelion.chak.service.PromotionInquiryService promotionInquiryService;
+    private final com.likelion.chak.service.BenefitSubmissionService benefitSubmissionService;
 
     @GetMapping("/ads")
     public ResponseEntity<List<AdvertisementResponse>> getAdvertisements(
@@ -231,5 +232,32 @@ public class AdminController {
             @Valid @RequestBody com.likelion.chak.dto.PromotionDtos.InquiryStatusRequest request) {
         authService.getAdmin(principal.userId());
         return ResponseEntity.ok(promotionInquiryService.changeStatus(principal.userId(), inquiryId, request.status()));
+    }
+
+    @GetMapping("/benefit-submissions")
+    public ResponseEntity<SliceResponse<com.likelion.chak.dto.BenefitDtos.SubmissionSummary>> getBenefitSubmissions(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(name = "status", required = false) com.likelion.chak.domain.PromotionInquiry.Status status,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(benefitSubmissionService.list(status, page, size));
+    }
+
+    @GetMapping("/benefit-submissions/{submissionId}")
+    public ResponseEntity<com.likelion.chak.dto.BenefitDtos.SubmissionDetail> getBenefitSubmission(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("submissionId") Long submissionId) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(benefitSubmissionService.detail(submissionId));
+    }
+
+    @PatchMapping("/benefit-submissions/{submissionId}")
+    public ResponseEntity<com.likelion.chak.dto.BenefitDtos.SubmissionSummary> changeBenefitSubmissionStatus(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("submissionId") Long submissionId,
+            @Valid @RequestBody com.likelion.chak.dto.BenefitDtos.StatusRequest request) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(benefitSubmissionService.changeStatus(principal.userId(), submissionId, request.status()));
     }
 }

@@ -406,6 +406,19 @@ await fetch(`${API_URL}/api/public/desks/${supporterToken}/messages`, {
 - 저장하면 운영자 디스코드에 "새 광고 상담 신청"(회사명·업종·관심 구성만, 연락처는 싣지 않음)이 갑니다.
 - 담당자 연락처가 들어 있어 **접수 1년 뒤 자동 삭제**합니다(`chak.retention.promotion-inquiry-days`).
 
+### 4.5 혜택 시안 신청
+
+제휴 업체가 `/promotion/apply`의 "시안 신청하기"에서 보내는 혜택 정보입니다(이전 Tally 설문을 대신함). 로그인 없이 호출합니다.
+
+1. 로고·쿠폰 코드 목록·매장 목록 파일이 있으면 먼저 `POST /api/public/promotion/benefit-uploads` `{ "purpose": "LOGO" | "SHEET", "fileName": "logo.png", "size": 12345 }`로 받은 `uploadUrl`에 `PUT`합니다(`headers`의 `Content-Type`을 그대로 보냄). 응답의 `key`를 답변에 넣습니다. `LOGO`는 png·jpg·svg·webp·pdf·ai·eps·zip, `SHEET`는 csv·xlsx·xls이고 20MB까지입니다. 접속자당 1시간 20번을 넘으면 `429`입니다.
+2. `POST /api/public/promotion/benefit-submissions` `{ "answers": { ... }, "website": "" }`로 보냅니다. `201 { "received": true }`.
+
+- 선택지는 한글 문구가 아니라 코드로 받습니다(예: `benefits: ["PERCENT", "SPECIAL_PRICE"]`). 코드 목록과 칸 이름은 `BenefitAnswerValidator`가 기준이고 화면의 `benefitSurvey.ts`와 같습니다.
+- 고른 선택지에 딸린 칸이 비면 `400 INVALID_BENEFIT_ANSWER`입니다(예: `PERCENT`를 골랐는데 `percent`가 없음). 숫자는 숫자로 받아야 하고(`"20퍼"`는 거절), `percent`는 1~100, `specialPrice`는 `regularPrice`보다 작아야 하고, `headlineRaw`는 20자 이내, `endDate`는 `startDate` 이후입니다. 알 수 없는 칸은 저장하지 않습니다.
+- 파일 키는 `promotion/uploads/<uuid>/<이름>` 모양이어야 하고, 저장소에 실제로 올라가 있어야 합니다.
+- `website`는 사람에게 보이지 않는 칸입니다. 값이 있으면 저장하지 않고 같은 `201`로 답합니다. 접속자당 1시간 5건(상담 신청과 합산), 전체 1시간 60건을 넘으면 `429 TOO_MANY_EVENTS`입니다. 같은 업체가 고쳐서 다시 보낼 수 있어 중복은 막지 않습니다.
+- 저장하면 운영자 디스코드에 "새 혜택 시안 신청"(브랜드·업종만)이 갑니다. 접수 1년 뒤 자동 삭제하고, 올린 파일도 S3 수명 규칙(`promotion/uploads/`)으로 같은 기간 뒤 지웁니다.
+
 ## 5. 내 책상 및 받은 편지 API
 
 아래 API는 모두 Bearer 인증이 필요합니다. 개인 책상은 계정당 하나만 만들 수 있습니다.
@@ -965,6 +978,9 @@ GET   /api/admin/analytics/summary?from={ISO_INSTANT}&to={ISO_INSTANT}
 ```text
 GET   /api/admin/promotion-inquiries?status=NEW&page=0&size=20   (status 생략 시 전체, 최신순)
 PATCH /api/admin/promotion-inquiries/{id}   { "status": "CONTACTED" }   NEW | CONTACTED | CLOSED
+GET   /api/admin/benefit-submissions?status=NEW&page=0&size=20   혜택 시안 신청 목록(최신순)
+GET   /api/admin/benefit-submissions/{id}   답변 전체와 올린 파일의 내려받기 주소(10분 유효)
+PATCH /api/admin/benefit-submissions/{id}   { "status": "CONTACTED" }   NEW | CONTACTED | CLOSED
 ```
 
 - 응답은 `SliceResponse<{ id, company, contactName, email, phone, category, interest, message, status, createdAt, handledAt }>`입니다. 없는 id는 `404 INQUIRY_NOT_FOUND`입니다.
