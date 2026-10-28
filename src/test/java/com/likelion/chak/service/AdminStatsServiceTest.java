@@ -87,6 +87,24 @@ class AdminStatsServiceTest {
     }
 
     @Test
+    void markedLoadTestGuestsCountPerVisitEvenIfAnOlderRunReusedItsCookie() {
+        LocalDate today = LocalDate.now(AdminStatsService.KST);
+        long beforeGuests = statsService.daily(today, today).days().get(0).guestVisitors();
+        long beforeSeoul = statsService.regions(today, today).items().stream()
+                .filter(item -> "11".equals(item.region())).mapToLong(item -> item.visitors()).sum();
+        GuestIdentity sharedGuest = guest();
+        for (int i = 0; i < 2; i++) {
+            var visit = new TrafficEventRequest(UUID.randomUUID().toString(), TrafficEventType.PAGE_VIEW,
+                    "load-test-guest-" + i, "/", null, "LOAD_TEST_GUEST", null, null);
+            analyticsService.record(null, sharedGuest, visit, new AnalyticsService.Geo("KR", "11"));
+        }
+        assertThat(statsService.daily(today, today).days().get(0).guestVisitors()).isEqualTo(beforeGuests + 2);
+        long afterSeoul = statsService.regions(today, today).items().stream()
+                .filter(item -> "11".equals(item.region())).mapToLong(item -> item.visitors()).sum();
+        assertThat(afterSeoul).isEqualTo(beforeSeoul + 2);
+    }
+
+    @Test
     void rangesAreValidated() {
         LocalDate today = LocalDate.now(AdminStatsService.KST);
         assertThatThrownBy(() -> statsService.daily(today, today.minusDays(1))).isInstanceOf(CustomException.class);

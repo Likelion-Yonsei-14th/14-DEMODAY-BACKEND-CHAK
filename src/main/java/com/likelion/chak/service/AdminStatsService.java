@@ -57,8 +57,8 @@ public class AdminStatsService {
         for (Object[] row : trafficRepository.findPageViewsBetween(fromInstant, toInstant)) {
             LocalDate day = day((Instant) row[0]);
             views.merge(day, 1L, Long::sum);
-            if (row[7] == AuthProvider.TEST && "LOAD_TEST_GUEST".equals(row[5])) {
-                // Earlier smoke events used a TEST token even for a guest visit.
+            if (isLoadTestGuest(row)) {
+                // A simulated visit is a distinct guest even when an older k6 run reused its cookie.
                 guests.computeIfAbsent(day, k -> new HashSet<>()).add("test:" + row[6]);
             } else if (row[1] != null) {
                 members.computeIfAbsent(day, k -> new HashSet<>()).add((Long) row[1]);
@@ -115,7 +115,7 @@ public class AdminStatsService {
             }
             Key key = new Key(country, region);
             views.merge(key, 1L, Long::sum);
-            String who = row[7] == AuthProvider.TEST && "LOAD_TEST_GUEST".equals(row[5]) ? "test:" + row[6]
+            String who = isLoadTestGuest(row) ? "test:" + row[6]
                     : row[1] != null ? "u" + row[1] : row[2] != null ? "g" + row[2] : null;
             if (who != null) {
                 visitors.computeIfAbsent(key, k -> new HashSet<>()).add(who);
@@ -138,6 +138,11 @@ public class AdminStatsService {
 
     private static LocalDate day(Instant instant) {
         return instant.atZone(KST).toLocalDate();
+    }
+
+    private static boolean isLoadTestGuest(Object[] row) {
+        return "LOAD_TEST_GUEST".equals(row[5])
+                && (row[1] == null || row[7] == AuthProvider.TEST);
     }
 
     private static Map<LocalDate, Long> countByDay(List<Instant> instants) {
