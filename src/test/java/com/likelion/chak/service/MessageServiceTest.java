@@ -132,6 +132,50 @@ class MessageServiceTest {
     }
 
     @Test
+    void cardWithNoPagesIsRejectedSoNoLetterCanBeBlank() {
+        PersonalDesk desk = createDesk(Instant.parse("2026-01-01T00:00:00Z"));
+        GuestSession guestSession = guestIdentityService.resolveOrCreate(null);
+        GuestMessageCreateRequest request = objectMapper.readValue("""
+                {
+                  "nickname": "친구",
+                  "kind": "CARD",
+                  "visibility": "PUBLIC",
+                  "schemaVersion": 1,
+                  "card": {"pages": []},
+                  "object": {"representationType": "LETTER", "x": 50, "y": 50, "rotation": 0, "scale": 1, "zIndex": 1}
+                }
+                """, GuestMessageCreateRequest.class);
+
+        assertThatThrownBy(() -> messageService.createGuestMessage(
+                desk.getSupporterToken(), guestSession.getGuestIdentity(), request))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_CARD_PAYLOAD);
+    }
+
+    @Test
+    void cardWithoutAPagesFieldIsRejected() {
+        PersonalDesk desk = createDesk(Instant.parse("2026-01-01T00:00:00Z"));
+        GuestSession guestSession = guestIdentityService.resolveOrCreate(null);
+        GuestMessageCreateRequest request = objectMapper.readValue("""
+                {
+                  "nickname": "친구",
+                  "kind": "CARD",
+                  "visibility": "PUBLIC",
+                  "schemaVersion": 1,
+                  "card": {},
+                  "object": {"representationType": "LETTER", "x": 50, "y": 50, "rotation": 0, "scale": 1, "zIndex": 1}
+                }
+                """, GuestMessageCreateRequest.class);
+
+        assertThatThrownBy(() -> messageService.createGuestMessage(
+                desk.getSupporterToken(), guestSession.getGuestIdentity(), request))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_CARD_PAYLOAD);
+    }
+
+    @Test
     void memberMessageUsesAccountNameWhenNicknameIsBlank() {
         PersonalDesk desk = createDesk(Instant.parse("2026-01-01T00:00:00Z"));
         UserAccount author = userAccountRepository.save(
