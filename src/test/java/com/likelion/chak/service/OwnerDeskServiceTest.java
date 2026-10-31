@@ -181,6 +181,106 @@ class OwnerDeskServiceTest {
         assertThat(firstPage.size()).isEqualTo(1);
     }
 
+    @Test
+    void movingTheDailyTimeLaterKeepsLockedLettersLockedAndStillWithoutContents() {
+        UserAccount owner = saveUser("owner-later");
+        deskService.createMyDesk(owner, createRequest(Instant.parse("2099-01-01T00:00:00Z")));
+        PersonalDesk desk = deskService.findByOwnerId(owner.getId());
+        createGuestMessage(desk, "PRIVATE");
+
+        deskService.updateMyDesk(owner.getId(), new DeskSettingsRequest(
+                "책상", ReadModeType.TIME_CAPSULE, null, Instant.parse("2100-01-01T00:00:00Z"),
+                true, MessageVisibility.PRIVATE, false, true));
+
+        OwnerMessageResponse stillLocked = messageService.getOwnerMessages(owner.getId(), true).get(0);
+        assertThat(stillLocked.locked()).isTrue();
+        assertThat(stillLocked.card()).isNull();
+        assertThat(stillLocked.unlockAt()).isEqualTo(Instant.parse("2100-01-01T00:00:00Z"));
+    }
+
+    @Test
+    void aLetterThatOpenedThroughRetimingComesBackWithItsContents() {
+        UserAccount owner = saveUser("owner-retime-card");
+        deskService.createMyDesk(owner, createRequest(Instant.parse("2099-01-01T00:00:00Z")));
+        PersonalDesk desk = deskService.findByOwnerId(owner.getId());
+        createGuestMessage(desk, "PRIVATE");
+        assertThat(messageService.getOwnerMessages(owner.getId(), true).get(0).card()).isNull();
+
+        deskService.updateMyDesk(owner.getId(), new DeskSettingsRequest(
+                "책상", ReadModeType.TIME_CAPSULE, null, Instant.parse("2026-01-01T00:00:00Z"),
+                true, MessageVisibility.PRIVATE, false, true));
+
+        OwnerMessageResponse opened = messageService.getOwnerMessages(owner.getId(), true).get(0);
+        assertThat(opened.locked()).isFalse();
+        assertThat(opened.card()).isNotNull();
+        assertThat(opened.card().get("pages")).hasSize(1);
+    }
+
+    @Test
+    void listWithoutLockedLettersHidesOnlyTheLockedOnes() {
+        UserAccount owner = saveUser("owner-hide-locked");
+        deskService.createMyDesk(owner, createRequest(Instant.parse("2026-01-01T00:00:00Z")));
+        PersonalDesk desk = deskService.findByOwnerId(owner.getId());
+        createGuestMessage(desk, "PRIVATE");
+        deskService.updateMyDesk(owner.getId(), new DeskSettingsRequest(
+                "책상", ReadModeType.TIME_CAPSULE, null, Instant.parse("2099-01-01T00:00:00Z"),
+                true, MessageVisibility.PRIVATE, false, true));
+        createGuestMessage(desk, "PRIVATE");
+
+        assertThat(messageService.getOwnerMessages(owner.getId(), true)).hasSize(2);
+        List<OwnerMessageResponse> visible = messageService.getOwnerMessages(owner.getId(), false);
+        assertThat(visible).hasSize(1);
+        assertThat(visible.get(0).locked()).isFalse();
+    }
+
+    @Test
+    void deletedLockedLetterIsNotRetimedOrListed() {
+        UserAccount owner = saveUser("owner-deleted-locked");
+        deskService.createMyDesk(owner, createRequest(Instant.parse("2099-01-01T00:00:00Z")));
+        PersonalDesk desk = deskService.findByOwnerId(owner.getId());
+        createGuestMessage(desk, "PRIVATE");
+        Long deliveryId = messageService.getOwnerMessages(owner.getId(), true).get(0).deliveryId();
+        // 잠긴 편지도 주인이 지울 수 있다.
+        messageService.deleteOwnerMessage(owner.getId(), deliveryId);
+
+        deskService.updateMyDesk(owner.getId(), new DeskSettingsRequest(
+                "책상", ReadModeType.TIME_CAPSULE, null, Instant.parse("2026-01-01T00:00:00Z"),
+                true, MessageVisibility.PRIVATE, false, true));
+
+        assertThat(messageService.getOwnerMessages(owner.getId(), true)).isEmpty();
+    }
+
+    @Test
+    void anotherOwnerCannotReadOrDeleteMyLetter() {
+        UserAccount owner = saveUser("owner-mine");
+        UserAccount other = saveUser("owner-other");
+        deskService.createMyDesk(owner, createRequest(Instant.parse("2026-01-01T00:00:00Z")));
+        deskService.createMyDesk(other, createRequest(Instant.parse("2026-01-01T00:00:00Z")));
+        createGuestMessage(deskService.findByOwnerId(owner.getId()), "PRIVATE");
+        Long deliveryId = messageService.getOwnerMessages(owner.getId(), true).get(0).deliveryId();
+
+        assertThat(messageService.getOwnerMessages(other.getId(), true)).isEmpty();
+        assertThatThrownBy(() -> messageService.markOwnerMessageRead(other.getId(), deliveryId))
+                .isInstanceOf(CustomException.class);
+        assertThatThrownBy(() -> messageService.deleteOwnerMessage(other.getId(), deliveryId))
+                .isInstanceOf(CustomException.class);
+        assertThat(messageService.getOwnerMessages(owner.getId(), true)).hasSize(1);
+    }
+
+    @Test
+    void readingTheSameLetterTwiceKeepsTheFirstReadTime() {
+        UserAccount owner = saveUser("owner-read-twice");
+        deskService.createMyDesk(owner, createRequest(Instant.parse("2026-01-01T00:00:00Z")));
+        createGuestMessage(deskService.findByOwnerId(owner.getId()), "PRIVATE");
+        Long deliveryId = messageService.getOwnerMessages(owner.getId(), true).get(0).deliveryId();
+
+        OwnerMessageResponse first = messageService.markOwnerMessageRead(owner.getId(), deliveryId);
+        OwnerMessageResponse second = messageService.markOwnerMessageRead(owner.getId(), deliveryId);
+
+        assertThat(second.status()).isEqualTo(MessageStatus.READ);
+        assertThat(second.readAt()).isEqualTo(first.readAt());
+    }
+
     private UserAccount saveUser(String kakaoId) {
         return userAccountRepository.save(UserAccount.createKakao(kakaoId, "책상주인", null, null));
     }
