@@ -75,6 +75,24 @@ public final class MinigameDtos {
     public record SneakyPhoneBoard(String period, List<LeaderboardEntry> entries, MyStanding me) {
     }
 
+    public record DeskBlastRoundCreated(String roundId, Instant expiresAt) {
+    }
+
+    /**
+     * 수능 블라스트가 끝났을 때 클라이언트가 가진 결과. 시간은 밀리초.
+     * 점수는 클라이언트가 계산한 값이라 서버가 규칙상 나올 수 있는 값인지만 본다.
+     */
+    public record DeskBlastSubmit(
+            @NotNull @Min(0) @Max(5_000_000) Integer score,
+            @NotNull @Min(0) @Max(5_000) Integer lines,
+            @NotNull @Min(0) @Max(5_000) Integer bestCombo,
+            @NotNull @Min(1) @Max(5_000) Integer placements,
+            @NotNull @Min(0) @Max(86_400_000) Long playMs) {
+    }
+
+    public record DeskBlastResult(int score, boolean ranked, Rank rank) {
+    }
+
     public record StudyTypeShare(String code, long count, double percent) {
     }
 

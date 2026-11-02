@@ -873,6 +873,34 @@ S3 버킷은 프론트 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허
 
 `status`는 `caught`(들킴) 또는 `survived`(30초 생존)입니다. 검사에 걸리면 `400 INVALID_MINIGAME_RESULT`이고 판은 그대로 남아 올바른 값으로 다시 낼 수 있습니다. 판은 **게임을 시작하는 순간** 만들어야 합니다(끝난 뒤에 만들면 게임 시간이 지나지 않은 것으로 보여 거절됩니다). 최고 점수가 아닌 판도 모두 제출해도 됩니다. 랭킹에는 회원별 최고 점수만 올라갑니다.
 
+**수능 블라스트**
+
+8x8 책상에 블록을 놓아 가로·세로 한 줄을 지우는 퍼즐입니다. 게임은 브라우저에서 돌아가므로 결과를 완전히 믿을 수는 없고, 서버는 **간단한 검사**만 합니다: 판을 서버가 발급해 한 번만 제출하게 하고, 숫자들이 한 게임에서 함께 나올 수 있는지(줄 수·최고 콤보·점수가 놓은 횟수로 낼 수 있는 범위인지), 블록을 놓는 속도가 사람이 낼 수 있는 속도인지, 판을 만든 뒤 플레이 시간이 실제로 지났는지 봅니다. 랭킹은 로그인 회원만 오릅니다.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| POST | `/api/public/minigames/desk-blast/rounds` | 게임을 **시작할 때** 판 만들기. 접속자당 시간당 60판 |
+| POST | `/api/public/minigames/desk-blast/rounds/{roundId}/submit` | 게임이 끝났을 때 결과 제출 |
+| GET | `/api/public/minigames/desk-blast/leaderboard?period=daily\|overall` | 상위 20명 + 내 순위(몰폰 랭킹과 같은 모양) |
+
+```json
+// POST .../rounds → 201
+{ "roundId": "…uuid…", "expiresAt": "…" }
+
+// POST .../submit  요청 (시간은 밀리초, score는 책상정리력)
+{ "score": 4200, "lines": 24, "bestCombo": 6, "placements": 60, "playMs": 100000 }
+// → 200
+{ "score": 4200, "ranked": true,
+  "rank": { "daily": 3, "overall": 12, "bestScoreToday": 4200, "bestScoreOverall": 4200 } }   // 비회원이면 ranked=false, rank=null
+```
+
+검사 기준(프런트 `deskBlastEngine.ts`의 규칙과 같은 값입니다):
+- `lines`는 `placements`의 2.25배(블록 한 칸이 가로·세로 두 줄에 속할 수 있고 줄은 8칸이라서) 이하이고, 한 번 놓아 6줄을 넘게 지울 수 없습니다.
+- `bestCombo`는 `lines`와 `placements`를 넘을 수 없습니다.
+- `score`는 `placements` 이상이고(놓을 때마다 칸 점수를 받음) `9 × placements + 60 × bestCombo × lines + 300 × lines` 이하입니다.
+- `playMs`는 `placements × 200`ms 이상이고, 판을 만든 뒤 서버가 본 시간 + 2초 이하입니다.
+- 검사에 걸리면 `400 INVALID_MINIGAME_RESULT`이고 판은 그대로 남아 올바른 값으로 다시 낼 수 있습니다. 판은 **게임을 시작하는 순간** 만들어야 합니다.
+
 **나의 수험생 유형은?**
 
 | 메서드 | 경로 | 설명 |
@@ -1059,7 +1087,7 @@ GET /api/admin/minigames/stats
 ```json
 {
   "games": [{
-    "game": "GUESS_GOD",                 // 또는 SNEAKY_PHONE
+    "game": "GUESS_GOD",                 // 또는 SNEAKY_PHONE, DESK_BLAST
     "startedToday": 120, "submittedToday": 96,       // 오늘 판을 받은 수 / 끝까지 제출한 수
     "submittedLast7Days": 540, "submittedLast14Days": 980,
     "averageScoreLast14Days": 3.1,        // 기록이 없으면 null
