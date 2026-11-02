@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 /** 로그인한 사용자가 즐겨찾기한 친구 책상. */
 @Getter
@@ -40,6 +41,7 @@ public class FavoriteDesk {
 
     @PrePersist
     void prePersist() {
-        this.createdAt = Instant.now();
+        // DB(DATETIME(6))가 담는 정밀도에 맞춰, 저장 직후 응답과 나중에 읽은 값이 같게 한다.
+        this.createdAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 }
