@@ -1175,6 +1175,29 @@ GET /api/admin/minigames/stats
 
 내가 보낸 편지에 책상 주인이 답장한 목록입니다(최신순, [5.8](#58-답장)과 같은 형식). `targetMessageIds`·`targetSenderNames`에는 **내 편지만** 들어갑니다.
 
+### 9.6 친구 책상 즐겨찾기
+
+로그인한 사용자가 친구 책상을 **즐겨찾기**해 두고 홈에서 모아 봅니다(편지를 쓴 뒤 "이 책상 즐겨찾기" 버튼에서도 씁니다). 책상은 링크의 `supporterToken`으로 가리킵니다. 로그인이 필요하며, 로그인하지 않은 상태로 부르면 `401`입니다(프론트는 로그인으로 안내하고, 로그인 뒤 다시 담습니다).
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/api/users/me/favorite-desks` | 즐겨찾는 책상 목록(최근에 담은 순) |
+| PUT | `/api/users/me/favorite-desks/{supporterToken}` | 담기. 이미 담았으면 그대로 `200`(담은 시각도 처음 그대로) |
+| DELETE | `/api/users/me/favorite-desks/{supporterToken}` | 풀기. 담지 않았거나 없는 책상이어도 `204` |
+
+```json
+// GET → 200
+[{ "supporterToken": "…uuid…", "displayName": "지수의 책상", "createdAt": "2026-11-03T01:02:03Z" }]
+
+// PUT → 200 (같은 모양의 한 개)
+{ "supporterToken": "…uuid…", "displayName": "지수의 책상", "createdAt": "2026-11-03T01:02:03Z" }
+```
+
+- `displayName`은 책상의 **지금 이름**입니다(주인이 바꾸면 따라 바뀝니다).
+- 지워진 책상은 목록에서 빠집니다. 지워진 책상이나 없는 토큰을 담으려 하면 `404 DESK_NOT_FOUND`입니다.
+- 한 사람이 담을 수 있는 책상은 **100개**까지입니다. 넘으면 `409 FAVORITE_LIMIT_EXCEEDED`이고, 이미 담은 책상을 다시 담는 건 한도와 상관없이 성공합니다.
+- 탈퇴(운영자 처리)하면 그 회원의 즐겨찾기는 지워집니다.
+
 ## 10. 결제와 광고 해제
 
 ### 10.1 결제

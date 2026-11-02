@@ -19,6 +19,9 @@
 | V13 | minigame_rounds(찍신 한 판), minigame_profiles(랭킹 닉네임), study_type_results(유형 테스트 결과) |
 | V14 | d1_course_responses(D+1 코스 짜기 응답, 통계용) |
 | V15 | users.profile_customized, user_avatars(직접 올린 프로필 사진) |
+| V19 | favorite_desks(친구 책상 즐겨찾기) |
+| V18 | exam_career_runs(커리어 시뮬레이터 한 판의 시작·끝 통계) |
+| V17 | benefit_submissions(혜택 시안 신청) |
 | V16 | push_subscriptions(답장 알림 웹 푸시 구독) |
 | V11 | personal_desks `claim_token`(넘겨받기 링크, UNIQUE)·`claimed_at`·`deleted_at`(삭제 표시) |
 | V10 | admin_invites(이메일로 운영자 권한 초대, 최초 운영자 시드) |
@@ -322,5 +325,6 @@ UNIQUE `(advertisement_id, event_type, session_id)` — 재시도 중복 방지.
 
 ## 답장 알림 구독 (V16)
 
+- `favorite_desks`: `user_id`(담은 회원), `desk_id`(담은 책상), `created_at`. `(user_id, desk_id)` UNIQUE. 책상을 지워도(soft delete) 행은 남지만 목록에서는 빠지고, 탈퇴한 회원의 행은 지운다. 인덱스 `(user_id, created_at)`.
 - `push_subscriptions`: `user_id` 또는 `guest_id`(둘 중 하나), `endpoint`(고유, 알려진 푸시 서비스 주소), `p256dh`·`auth`(받는 브라우저의 암호 키), `created_at`, `last_success_at`, `failure_count`. 인덱스 `user_id`, `guest_id`.
 - 회원 탈퇴 처리 때 그 회원의 구독을 지우고, 180일 동안 알림이 한 번도 전달되지 않은 구독은 정리 배치가 지웁니다.
