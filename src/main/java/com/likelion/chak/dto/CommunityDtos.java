@@ -78,6 +78,10 @@ public final class CommunityDtos {
             Instant createdAt) {
     }
 
+    /** 즐겨찾는 친구 책상. 책상의 현재 이름을 그대로 보여 준다. */
+    public record FavoriteDeskResponse(String supporterToken, String displayName, Instant createdAt) {
+    }
+
     public enum ReportAction {
         DISMISS,
         REMOVE_MESSAGE

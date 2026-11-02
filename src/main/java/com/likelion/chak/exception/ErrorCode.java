@@ -16,6 +16,7 @@ public enum ErrorCode {
     EXPIRED_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "EXPIRED_REFRESH_TOKEN", "리프레시 토큰이 만료되었습니다."),
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "요청 값이 올바르지 않습니다."),
     DESK_NOT_FOUND(HttpStatus.NOT_FOUND, "DESK_NOT_FOUND", "응원 책상을 찾을 수 없습니다."),
+    FAVORITE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "FAVORITE_LIMIT_EXCEEDED", "즐겨찾는 책상은 최대 100개까지 담을 수 있어요."),
     DESK_ALREADY_EXISTS(HttpStatus.CONFLICT, "DESK_ALREADY_EXISTS", "이미 개인 응원 책상이 있습니다."),
     CLAIM_NOT_AVAILABLE(HttpStatus.NOT_FOUND, "CLAIM_NOT_AVAILABLE", "이미 사용했거나 없는 책상 링크입니다."),
     CLAIM_CONFIRMATION_REQUIRED(HttpStatus.BAD_REQUEST, "CLAIM_CONFIRMATION_REQUIRED", "책상의 주인 본인인지 확인이 필요합니다."),

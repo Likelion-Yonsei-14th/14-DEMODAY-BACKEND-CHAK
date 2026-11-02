@@ -11,6 +11,9 @@ public interface PersonalDeskRepository extends JpaRepository<PersonalDesk, Long
 
     Optional<PersonalDesk> findBySupporterTokenAndDeletedAtIsNull(String supporterToken);
 
+    /** 지워진 책상도 찾는다(즐겨찾기를 풀 때 쓴다). */
+    Optional<PersonalDesk> findBySupporterToken(String supporterToken);
+
     Optional<PersonalDesk> findByClaimToken(String claimToken);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

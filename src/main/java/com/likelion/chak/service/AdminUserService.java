@@ -51,6 +51,7 @@ public class AdminUserService {
     private final MinigameProfileRepository minigameProfileRepository;
     private final UserAvatarRepository userAvatarRepository;
     private final com.likelion.chak.push.PushSubscriptionRepository pushSubscriptionRepository;
+    private final com.likelion.chak.repository.FavoriteDeskRepository favoriteDeskRepository;
 
     @Transactional(readOnly = true)
     public SliceResponse<UserSummary> list(String query, String state, int page, int size) {
@@ -118,6 +119,7 @@ public class AdminUserService {
         minigameProfileRepository.deleteById(userId);
         userAvatarRepository.deleteById(userId);
         pushSubscriptionRepository.deleteAllByUserId(userId);
+        favoriteDeskRepository.deleteAllByUserId(userId);
         messageRepository.anonymizeAuthor(userId, UserAccount.WITHDRAWN_NAME);
         deskRepository.findForUpdateByOwnerId(userId).ifPresent(PersonalDesk::closeForWithdrawnOwner);
         auditLogRepository.save(new AdminAuditLog(admin, "WITHDRAW_USER", "USER", userId,
