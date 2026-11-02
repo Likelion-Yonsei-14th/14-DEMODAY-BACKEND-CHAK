@@ -105,4 +105,21 @@ public final class MinigameDtos {
 
     public record D1CourseReceived(boolean received) {
     }
+
+    /**
+     * 수험생 커리어 한 판. {@code finished}가 false면 시작만 알리고, true면 결과(재수 횟수, 최종 수능 평균, 진학 단계, 칭호)도 함께 받는다.
+     * {@code runId}가 같으면 같은 판으로 본다.
+     */
+    public record ExamCareerRunRequest(
+            @NotBlank @Pattern(regexp = "^[0-9a-fA-F-]{36}$") String runId,
+            @NotBlank @Size(max = 12) String track,
+            boolean finished,
+            @Min(0) @Max(20) Integer attempt,
+            @DecimalMin("1.0") @DecimalMax("9.0") Double finalAverage,
+            @Size(max = 20) String enrolled,
+            @Size(max = 30) @Pattern(regexp = "^[가-힣0-9 ]*$") String title) {
+    }
+
+    public record ExamCareerRunReceived(boolean received) {
+    }
 }

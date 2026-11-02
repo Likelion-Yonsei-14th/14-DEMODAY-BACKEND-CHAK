@@ -74,6 +74,7 @@ public enum ErrorCode {
     INVALID_MINIGAME_ANSWERS(HttpStatus.BAD_REQUEST, "INVALID_MINIGAME_ANSWERS", "제출한 답이 올바르지 않습니다."),
     INVALID_MINIGAME_RESULT(HttpStatus.BAD_REQUEST, "INVALID_MINIGAME_RESULT", "게임 결과가 올바르지 않습니다."),
     INVALID_D1_COURSE_RESPONSE(HttpStatus.BAD_REQUEST, "INVALID_D1_COURSE_RESPONSE", "코스 응답 형식이 올바르지 않습니다."),
+    INVALID_EXAM_CAREER_RUN(HttpStatus.BAD_REQUEST, "INVALID_EXAM_CAREER_RUN", "커리어 기록 형식이 올바르지 않습니다."),
     INVALID_DISPLAY_NAME(HttpStatus.BAD_REQUEST, "INVALID_DISPLAY_NAME", "이름은 한글·영문·숫자·공백·마침표·밑줄·하이픈·괄호로 1~20자여야 합니다."),
     INVALID_AVATAR(HttpStatus.BAD_REQUEST, "INVALID_AVATAR", "프로필 사진을 처리할 수 없습니다. JPEG·PNG·WebP 150KB 이하 사진을 올려주세요."),
     AVATAR_NOT_FOUND(HttpStatus.NOT_FOUND, "AVATAR_NOT_FOUND", "프로필 사진을 찾을 수 없습니다."),
