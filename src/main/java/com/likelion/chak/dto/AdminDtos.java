@@ -119,6 +119,29 @@ public final class AdminDtos {
             List<KeyCount> regions) {
     }
 
-    public record MinigameStatsResponse(List<MinigameGameStats> games, StudyTypeAdminStats studyType, D1CourseAdminStats d1Course) {
+    public record ExamCareerDay(LocalDate date, long started, long finished) {
+    }
+
+    /**
+     * 수험생 커리어 시뮬레이터: 시작과 끝까지 한 판 수, 끝난 판의 재수 횟수·진학 단계·칭호 분포(많은 순).
+     * {@code attempts}의 key는 재수 횟수("0"=현역)이고 평균은 끝난 판의 최종 수능 평균 등급이다.
+     */
+    public record ExamCareerAdminStats(
+            long started,
+            long startedToday,
+            long startedLast7Days,
+            long finished,
+            long finishedLast7Days,
+            Double averageFinalGrade,
+            List<KeyCount> tracks,
+            List<KeyCount> attempts,
+            List<KeyCount> enrolled,
+            List<KeyCount> titles,
+            List<ExamCareerDay> days) {
+    }
+
+    public record MinigameStatsResponse(
+            List<MinigameGameStats> games, StudyTypeAdminStats studyType, D1CourseAdminStats d1Course,
+            ExamCareerAdminStats examCareer) {
     }
 }
