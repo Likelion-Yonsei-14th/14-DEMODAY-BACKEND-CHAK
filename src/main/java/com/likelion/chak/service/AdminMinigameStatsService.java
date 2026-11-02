@@ -7,8 +7,11 @@ import com.likelion.chak.dto.AdminDtos.MinigameGameStats;
 import com.likelion.chak.dto.AdminDtos.MinigameStatsResponse;
 import com.likelion.chak.dto.AdminDtos.StudyTypeAdminStats;
 import com.likelion.chak.dto.AdminDtos.StudyTypeShareStat;
+import com.likelion.chak.dto.AdminDtos.ExamCareerAdminStats;
+import com.likelion.chak.dto.AdminDtos.ExamCareerDay;
 import com.likelion.chak.repository.D1CourseResponseRepository;
 import com.likelion.chak.repository.D1CourseResponseRepository.KeyCount;
+import com.likelion.chak.repository.ExamCareerRunRepository;
 import com.likelion.chak.repository.MinigameRoundRepository;
 import com.likelion.chak.repository.StudyTypeResultRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +36,7 @@ public class AdminMinigameStatsService {
     private final StudyTypeResultRepository studyTypeRepository;
     private final StudyTypeService studyTypeService;
     private final D1CourseResponseRepository d1CourseRepository;
+    private final ExamCareerRunRepository examCareerRepository;
 
     @Transactional(readOnly = true)
     public MinigameStatsResponse stats() {
@@ -41,7 +45,7 @@ public class AdminMinigameStatsService {
         for (MinigameType game : MinigameType.values()) {
             games.add(game(game, today));
         }
-        return new MinigameStatsResponse(games, studyType(today), d1Course(today));
+        return new MinigameStatsResponse(games, studyType(today), d1Course(today), examCareer(today));
     }
 
     private MinigameGameStats game(MinigameType game, LocalDate today) {
@@ -119,6 +123,54 @@ public class AdminMinigameStatsService {
                 ranked(d1CourseRepository.countByCompanion()),
                 ranked(d1CourseRepository.countByBudget()),
                 ranked(d1CourseRepository.countByRegion()));
+    }
+
+    private ExamCareerAdminStats examCareer(LocalDate today) {
+        LocalDate firstDay = today.minusDays(DAYS - 1);
+        long[] started = new long[DAYS];
+        long[] finished = new long[DAYS];
+        for (Object[] row : examCareerRepository.runsSince(firstDay.atStartOfDay(KST).toInstant())) {
+            int index = (int) java.time.temporal.ChronoUnit.DAYS.between(firstDay, ((Instant) row[0]).atZone(KST).toLocalDate());
+            if (index >= 0 && index < DAYS) {
+                started[index]++;
+            }
+            if ((boolean) row[1]) {
+                // 끝난 날은 결과를 받은 시각(마지막 갱신)으로 센다.
+                int doneIndex = (int) java.time.temporal.ChronoUnit.DAYS.between(firstDay, ((Instant) row[2]).atZone(KST).toLocalDate());
+                if (doneIndex >= 0 && doneIndex < DAYS) {
+                    finished[doneIndex]++;
+                }
+            }
+        }
+        List<ExamCareerDay> days = new ArrayList<>();
+        long startedLast7 = 0;
+        long finishedLast7 = 0;
+        for (int i = 0; i < DAYS; i++) {
+            days.add(new ExamCareerDay(firstDay.plusDays(i), started[i], finished[i]));
+            if (i >= DAYS - 7) {
+                startedLast7 += started[i];
+                finishedLast7 += finished[i];
+            }
+        }
+        Double average = examCareerRepository.averageFinalGrade();
+        return new ExamCareerAdminStats(
+                examCareerRepository.count(),
+                started[DAYS - 1],
+                startedLast7,
+                examCareerRepository.countByFinishedTrue(),
+                finishedLast7,
+                average == null ? null : Math.round(average * 100.0) / 100.0,
+                rankedRuns(examCareerRepository.countByTrack()),
+                rankedRuns(examCareerRepository.countByAttempt()),
+                rankedRuns(examCareerRepository.countByEnrolled()),
+                rankedRuns(examCareerRepository.countByTitle()),
+                days);
+    }
+
+    private static List<com.likelion.chak.dto.AdminDtos.KeyCount> rankedRuns(List<ExamCareerRunRepository.KeyCount> rows) {
+        return rows.stream()
+                .map(row -> new com.likelion.chak.dto.AdminDtos.KeyCount(row.getKey(), row.getCount()))
+                .sorted(BY_COUNT).toList();
     }
 
     private static final java.util.Comparator<com.likelion.chak.dto.AdminDtos.KeyCount> BY_COUNT =

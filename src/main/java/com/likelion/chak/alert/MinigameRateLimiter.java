@@ -28,7 +28,9 @@ public class MinigameRateLimiter {
         DESK_BLAST_ROUND(60, 3_600_000L),
         STUDY_TYPE_RESULT(20, 600_000L),
         /** 코스 응답은 한 판에 한두 번 보내고, 학교 공용 와이파이처럼 한 주소에 여럿이 있을 수 있어 넉넉하게 시간당 60건. */
-        D1_COURSE_RESPONSE(60, 3_600_000L);
+        D1_COURSE_RESPONSE(60, 3_600_000L),
+        /** 한 판에 시작과 끝 두 번만 보내지만 학교 공용 와이파이를 감안해 시간당 120건. */
+        EXAM_CAREER_RUN(120, 3_600_000L);
 
         final int limit;
         final long windowMs;

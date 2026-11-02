@@ -9,6 +9,8 @@ import com.likelion.chak.dto.MinigameDtos.D1CourseRequest;
 import com.likelion.chak.dto.MinigameDtos.DeskBlastResult;
 import com.likelion.chak.dto.MinigameDtos.DeskBlastRoundCreated;
 import com.likelion.chak.dto.MinigameDtos.DeskBlastSubmit;
+import com.likelion.chak.dto.MinigameDtos.ExamCareerRunReceived;
+import com.likelion.chak.dto.MinigameDtos.ExamCareerRunRequest;
 import com.likelion.chak.dto.MinigameDtos.Leaderboard;
 import com.likelion.chak.dto.MinigameDtos.RoundCreated;
 import com.likelion.chak.dto.MinigameDtos.SneakyPhoneBoard;
@@ -24,6 +26,7 @@ import com.likelion.chak.exception.ErrorCode;
 import com.likelion.chak.service.AuthService;
 import com.likelion.chak.service.D1CourseService;
 import com.likelion.chak.service.DeskBlastService;
+import com.likelion.chak.service.ExamCareerRunService;
 import com.likelion.chak.service.GuessGodService;
 import com.likelion.chak.service.SneakyPhoneService;
 import com.likelion.chak.service.StudyTypeService;
@@ -54,6 +57,7 @@ public class MinigameController {
     private final DeskBlastService deskBlastService;
     private final StudyTypeService studyTypeService;
     private final D1CourseService d1CourseService;
+    private final ExamCareerRunService examCareerRunService;
     private final AuthService authService;
     private final MinigameRateLimiter rateLimiter;
 
@@ -141,6 +145,17 @@ public class MinigameController {
         }
         boolean created = d1CourseService.record(request);
         return ResponseEntity.status(created ? HttpStatus.CREATED : HttpStatus.OK).body(new D1CourseReceived(true));
+    }
+
+    /** 로그인 없이, 계정과 연결하지 않고 받는다. 새 판은 201, 이미 있는 판에 끝난 결과를 보태면 200. */
+    @PostMapping("/exam-career/runs")
+    public ResponseEntity<ExamCareerRunReceived> recordExamCareerRun(
+            @Valid @RequestBody ExamCareerRunRequest request, HttpServletRequest http) {
+        if (!rateLimiter.tryAcquire(Action.EXAM_CAREER_RUN, "ip" + ClientIp.of(http))) {
+            throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
+        }
+        boolean created = examCareerRunService.record(request);
+        return ResponseEntity.status(created ? HttpStatus.CREATED : HttpStatus.OK).body(new ExamCareerRunReceived(true));
     }
 
     @PostMapping("/study-type/results")
