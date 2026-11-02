@@ -93,8 +93,9 @@ class AdminMinigameStatsApiTest {
     @Test
     void includesEveryGameAndTheStudyTypeSummary() throws Exception {
         JsonNode result = stats(user(true));
-        assertThat(result.get("games")).hasSize(2);
+        assertThat(result.get("games")).hasSize(3);
         assertThat(game(result, "GUESS_GOD").get("days")).hasSize(14);
+        assertThat(game(result, "DESK_BLAST").get("days")).hasSize(14);
         JsonNode study = result.get("studyType");
         assertThat(study.get("distribution")).hasSize(8);
         assertThat(study.get("total").asLong()).isGreaterThanOrEqualTo(study.get("members").asLong());

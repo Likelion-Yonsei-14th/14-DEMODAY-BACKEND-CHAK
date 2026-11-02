@@ -6,6 +6,9 @@ import com.likelion.chak.config.AuthenticatedUser;
 import com.likelion.chak.domain.UserAccount;
 import com.likelion.chak.dto.MinigameDtos.D1CourseReceived;
 import com.likelion.chak.dto.MinigameDtos.D1CourseRequest;
+import com.likelion.chak.dto.MinigameDtos.DeskBlastResult;
+import com.likelion.chak.dto.MinigameDtos.DeskBlastRoundCreated;
+import com.likelion.chak.dto.MinigameDtos.DeskBlastSubmit;
 import com.likelion.chak.dto.MinigameDtos.Leaderboard;
 import com.likelion.chak.dto.MinigameDtos.RoundCreated;
 import com.likelion.chak.dto.MinigameDtos.SneakyPhoneBoard;
@@ -20,6 +23,7 @@ import com.likelion.chak.exception.CustomException;
 import com.likelion.chak.exception.ErrorCode;
 import com.likelion.chak.service.AuthService;
 import com.likelion.chak.service.D1CourseService;
+import com.likelion.chak.service.DeskBlastService;
 import com.likelion.chak.service.GuessGodService;
 import com.likelion.chak.service.SneakyPhoneService;
 import com.likelion.chak.service.StudyTypeService;
@@ -47,6 +51,7 @@ public class MinigameController {
 
     private final GuessGodService guessGodService;
     private final SneakyPhoneService sneakyPhoneService;
+    private final DeskBlastService deskBlastService;
     private final StudyTypeService studyTypeService;
     private final D1CourseService d1CourseService;
     private final AuthService authService;
@@ -100,6 +105,31 @@ public class MinigameController {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
         return ResponseEntity.ok(sneakyPhoneService.leaderboard(period, viewer(principal)));
+    }
+
+    @PostMapping("/desk-blast/rounds")
+    public ResponseEntity<DeskBlastRoundCreated> createDeskBlastRound(
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest http) {
+        limit(Action.DESK_BLAST_ROUND, principal, http);
+        return ResponseEntity.status(HttpStatus.CREATED).body(deskBlastService.createRound());
+    }
+
+    @PostMapping("/desk-blast/rounds/{roundId}/submit")
+    public ResponseEntity<DeskBlastResult> submitDeskBlast(
+            @PathVariable String roundId,
+            @Valid @RequestBody DeskBlastSubmit request,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(deskBlastService.submit(roundId, request, viewer(principal)));
+    }
+
+    @GetMapping("/desk-blast/leaderboard")
+    public ResponseEntity<SneakyPhoneBoard> deskBlastLeaderboard(
+            @RequestParam(defaultValue = "daily") String period,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        if (!"daily".equals(period) && !"overall".equals(period)) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        return ResponseEntity.ok(deskBlastService.leaderboard(period, viewer(principal)));
     }
 
     /** 로그인 없이, 계정과 연결하지 않고 받는다. 새 응답은 201, 같은 응답을 다시 받으면 200. */

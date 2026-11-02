@@ -2,5 +2,6 @@ package com.likelion.chak.domain;
 
 public enum MinigameType {
     GUESS_GOD,
-    SNEAKY_PHONE
+    SNEAKY_PHONE,
+    DESK_BLAST
 }
