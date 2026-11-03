@@ -82,7 +82,7 @@ public class AdminStatsService {
                     views.getOrDefault(day, 0L), signups.getOrDefault(day, 0L), desks.getOrDefault(day, 0L),
                     messages.getOrDefault(day, 0L), charges.getOrDefault(day, 0L)));
         }
-        return new DailyStatsResponse(start, end, userRepository.countByDeletedAtIsNullAndProviderNot(AuthProvider.TEST), deskRepository.count(),
+        return new DailyStatsResponse(start, end, userRepository.countByDeletedAtIsNull(), deskRepository.count(),
                 messageRepository.countByStatusNot(MessageStatus.DELETED), days);
     }
 
