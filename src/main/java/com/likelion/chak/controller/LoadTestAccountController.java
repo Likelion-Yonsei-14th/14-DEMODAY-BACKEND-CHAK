@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -44,6 +46,7 @@ public class LoadTestAccountController {
     private String provisionKey;
 
     public record ProvisionRequest(String runId, int count) {}
+    public record ReissueRequest(List<Long> userIds) {}
     public record ProvisionedAccount(long userId, String accessToken, String refreshToken, long expiresIn) {}
     public record ActualVisitors(LocalDate date, long members, long guests, long naturalMembers, long naturalGuests) {}
     public record RegionCount(String region, String trafficType, long visits) {}
@@ -96,6 +99,34 @@ public class LoadTestAccountController {
             AuthTokenResponse issued = tokens.issue(user);
             result.add(new ProvisionedAccount(user.getId(), issued.accessToken(),
                     issued.refreshToken(), issued.expiresIn()));
+        }
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(result);
+    }
+
+    /** Issues fresh tokens for existing load-test users without creating another account. */
+    @PostMapping("/accounts/reissue")
+    @Transactional
+    public ResponseEntity<List<ProvisionedAccount>> reissue(
+            @RequestHeader(value = "X-Chak-Load-Key", required = false) String providedKey,
+            @RequestBody ReissueRequest request) {
+        if (!authorized(providedKey)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (request == null || request.userIds() == null || request.userIds().isEmpty()
+                || request.userIds().size() > 200 || request.userIds().stream().anyMatch(id -> id == null || id < 1)
+                || new HashSet<>(request.userIds()).size() != request.userIds().size()) {
+            return ResponseEntity.badRequest().build();
+        }
+        var byId = new HashMap<Long, UserAccount>();
+        users.findAllById(request.userIds()).forEach(user -> byId.put(user.getId(), user));
+        if (request.userIds().stream().anyMatch(id -> {
+            UserAccount user = byId.get(id);
+            return user == null || user.getProvider() != AuthProvider.TEST || user.isDeleted()
+                    || !user.getProviderUserId().startsWith("loadtest:");
+        })) return ResponseEntity.badRequest().build();
+
+        List<ProvisionedAccount> result = new ArrayList<>();
+        for (Long id : request.userIds()) {
+            AuthTokenResponse issued = tokens.issue(byId.get(id));
+            result.add(new ProvisionedAccount(id, issued.accessToken(), issued.refreshToken(), issued.expiresIn()));
         }
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(result);
     }

@@ -7,6 +7,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.ActiveProfiles;
+import com.likelion.chak.repository.UserAccountRepository;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,6 +22,7 @@ class LoadTestAccountControllerTest {
 
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper json;
+    @Autowired private UserAccountRepository users;
 
     @Test
     void requiresProvisionKey() throws Exception {
@@ -67,6 +69,35 @@ class LoadTestAccountControllerTest {
                         .content("{\"refreshToken\":\"" + refresh + "\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         assertThat(json.readTree(rotated).get("refreshToken").asText()).isNotEqualTo(refresh);
+    }
+
+    @Test
+    void reissuesExistingTestAccountsWithoutCreatingNewUsers() throws Exception {
+        String key = "01234567890123456789012345678901";
+        String runId = "reuse-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        var created = json.readTree(mvc.perform(post("/api/load-test/accounts")
+                .header("X-Chak-Load-Key", key).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"runId\":\"" + runId + "\",\"count\":2}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        long firstId = created.get(0).get("userId").asLong();
+        long secondId = created.get(1).get("userId").asLong();
+        long before = users.countByDeletedAtIsNull();
+
+        var reissued = json.readTree(mvc.perform(post("/api/load-test/accounts/reissue")
+                .header("X-Chak-Load-Key", key).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userIds\":[" + secondId + "," + firstId + "]}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(reissued.get(0).get("userId").asLong()).isEqualTo(secondId);
+        assertThat(reissued.get(1).get("userId").asLong()).isEqualTo(firstId);
+        assertThat(reissued.get(0).get("refreshToken").asText()).isNotEqualTo(created.get(1).get("refreshToken").asText());
+        assertThat(users.countByDeletedAtIsNull()).isEqualTo(before);
+
+        mvc.perform(post("/api/load-test/accounts/reissue").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userIds\":[" + firstId + "]}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/load-test/accounts/reissue").header("X-Chak-Load-Key", key)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"userIds\":[" + firstId + "," + firstId + "]}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
