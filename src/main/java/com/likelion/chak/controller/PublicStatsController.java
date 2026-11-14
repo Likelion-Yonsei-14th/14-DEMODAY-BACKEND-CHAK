@@ -35,7 +35,7 @@ public class PublicStatsController {
         LocalDate lastDay = LocalDate.now(KST).minusDays(1);
         Cached current = cached;
         if (current == null || !current.series().to().equals(lastDay) || current.until().isBefore(Instant.now())) {
-            List<DailyVisitors> days = lastDay.isBefore(FIRST_DAY) ? List.of() : statsService.naturalSeries(FIRST_DAY, lastDay);
+            List<DailyVisitors> days = lastDay.isBefore(FIRST_DAY) ? List.of() : statsService.visitorSeries(FIRST_DAY, lastDay);
             current = new Cached(new VisitorSeries(FIRST_DAY, lastDay, days), Instant.now().plus(CACHE));
             cached = current;
         }

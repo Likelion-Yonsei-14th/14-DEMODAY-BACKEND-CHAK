@@ -121,25 +121,19 @@ class AdminStatsServiceTest {
     }
 
     @Test
-    void naturalSeriesListsEveryDayAndLeavesOutTestTraffic() {
+    void visitorSeriesMatchesTheDashboardNumbers() {
         LocalDate today = LocalDate.now(AdminStatsService.KST);
-        long before = statsService.naturalSeries(today.minusDays(2), today).get(2).visitors();
-        UserAccount natural = userRepository.save(UserAccount.createKakao("k-" + UUID.randomUUID(), "회원", null, null));
-        UserAccount test = userRepository.save(UserAccount.create(AuthProvider.TEST, "loadtest:" + UUID.randomUUID(), "부하시험", null, null));
-        GuestIdentity visitor = guest();
-        analyticsService.record(natural, null, pageView("/"));
-        analyticsService.record(natural, null, pageView("/home"));
-        analyticsService.record(test, null, pageView("/"));
-        analyticsService.record(null, visitor, pageView("/"));
-        analyticsService.record(null, visitor, pageView("/promotion"));
-        analyticsService.record(null, guest(), new TrafficEventRequest(UUID.randomUUID().toString(),
-                TrafficEventType.PAGE_VIEW, "test-session", "/", null, "LOAD_TEST_GUEST", null, null));
+        UserAccount member = userRepository.save(UserAccount.createKakao("k-" + UUID.randomUUID(), "회원", null, null));
+        analyticsService.record(member, null, pageView("/"));
+        analyticsService.record(null, guest(), pageView("/promotion"));
 
-        var series = statsService.naturalSeries(today.minusDays(2), today);
+        var series = statsService.visitorSeries(today.minusDays(2), today);
+        var dashboard = statsService.daily(today.minusDays(2), today).days();
 
         assertThat(series).extracting(AdminStatsService.DailyVisitors::date)
                 .containsExactly(today.minusDays(2), today.minusDays(1), today);
-        assertThat(series.get(2).visitors()).isEqualTo(before + 2);
+        assertThat(series).extracting(AdminStatsService.DailyVisitors::visitors)
+                .containsExactlyElementsOf(dashboard.stream().map(DailyStat::visitors).toList());
     }
 
     @Test
