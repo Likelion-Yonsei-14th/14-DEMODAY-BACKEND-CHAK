@@ -103,6 +103,27 @@ public class AdminStatsService {
 
     public record NaturalVisitors(long members, long guests) {}
 
+    /** 날짜별 실제 방문자 수(부하 테스트와 TEST 계정 제외). 광고 제안 페이지에 공개하는 숫자다. */
+    @Transactional(readOnly = true)
+    public List<DailyVisitors> naturalSeries(LocalDate from, LocalDate to) {
+        validate(from, to);
+        Instant start = from.atStartOfDay(KST).toInstant();
+        Instant end = to.plusDays(1).atStartOfDay(KST).toInstant();
+        Map<LocalDate, Set<String>> visitors = new HashMap<>();
+        for (Object[] row : trafficRepository.findPageViewsBetween(start, end)) {
+            if (row[7] == AuthProvider.TEST || isLoadTestGuest(row)) continue;
+            String who = row[1] != null ? "m:" + row[1] : row[2] != null ? "g:" + row[2] : null;
+            if (who != null) visitors.computeIfAbsent(day((Instant) row[0]), k -> new HashSet<>()).add(who);
+        }
+        List<DailyVisitors> days = new ArrayList<>();
+        for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
+            days.add(new DailyVisitors(day, visitors.getOrDefault(day, Set.of()).size()));
+        }
+        return days;
+    }
+
+    public record DailyVisitors(LocalDate date, long visitors) {}
+
     @Transactional(readOnly = true)
     public RegionStatsResponse regions(LocalDate from, LocalDate to) {
         LocalDate end = to == null ? LocalDate.now(KST) : to;

@@ -121,6 +121,28 @@ class AdminStatsServiceTest {
     }
 
     @Test
+    void naturalSeriesListsEveryDayAndLeavesOutTestTraffic() {
+        LocalDate today = LocalDate.now(AdminStatsService.KST);
+        long before = statsService.naturalSeries(today.minusDays(2), today).get(2).visitors();
+        UserAccount natural = userRepository.save(UserAccount.createKakao("k-" + UUID.randomUUID(), "회원", null, null));
+        UserAccount test = userRepository.save(UserAccount.create(AuthProvider.TEST, "loadtest:" + UUID.randomUUID(), "부하시험", null, null));
+        GuestIdentity visitor = guest();
+        analyticsService.record(natural, null, pageView("/"));
+        analyticsService.record(natural, null, pageView("/home"));
+        analyticsService.record(test, null, pageView("/"));
+        analyticsService.record(null, visitor, pageView("/"));
+        analyticsService.record(null, visitor, pageView("/promotion"));
+        analyticsService.record(null, guest(), new TrafficEventRequest(UUID.randomUUID().toString(),
+                TrafficEventType.PAGE_VIEW, "test-session", "/", null, "LOAD_TEST_GUEST", null, null));
+
+        var series = statsService.naturalSeries(today.minusDays(2), today);
+
+        assertThat(series).extracting(AdminStatsService.DailyVisitors::date)
+                .containsExactly(today.minusDays(2), today.minusDays(1), today);
+        assertThat(series.get(2).visitors()).isEqualTo(before + 2);
+    }
+
+    @Test
     void rangesAreValidated() {
         LocalDate today = LocalDate.now(AdminStatsService.KST);
         assertThatThrownBy(() -> statsService.daily(today, today.minusDays(1))).isInstanceOf(CustomException.class);
