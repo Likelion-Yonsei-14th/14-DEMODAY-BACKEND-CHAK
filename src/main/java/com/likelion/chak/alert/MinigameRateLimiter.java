@@ -30,7 +30,9 @@ public class MinigameRateLimiter {
         /** 코스 응답은 한 판에 한두 번 보내고, 학교 공용 와이파이처럼 한 주소에 여럿이 있을 수 있어 넉넉하게 시간당 60건. */
         D1_COURSE_RESPONSE(60, 3_600_000L),
         /** 한 판에 시작과 끝 두 번만 보내지만 학교 공용 와이파이를 감안해 시간당 120건. */
-        EXAM_CAREER_RUN(120, 3_600_000L);
+        EXAM_CAREER_RUN(120, 3_600_000L),
+        /** 수능 여론 투표. 한 사람이 하루 열 개 안팎을 고르지만 학교·학원 공용 와이파이를 감안해 시간당 300건. */
+        POLL_VOTE(300, 3_600_000L);
 
         final int limit;
         final long windowMs;
