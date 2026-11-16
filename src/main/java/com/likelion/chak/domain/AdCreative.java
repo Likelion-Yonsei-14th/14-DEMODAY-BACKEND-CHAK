@@ -24,8 +24,9 @@ public class AdCreative {
     @Column(name = "byte_size", nullable = false)
     private int byteSize;
 
+    /** MySQL LONGBLOB. 길이를 크게 잡아야 검증 때 tinyblob로 보지 않는다. */
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, length = org.hibernate.Length.LONG32)
     private byte[] data;
 
     @Column(name = "created_by")
