@@ -56,7 +56,7 @@
 | DeskObjectType (`representationType`) | `MEMO`, `PHOTO_CARD`, `CHARM`, `POSTER_CARD`, `LETTER`, `TICKET`, `GENERIC_CARD`, `STICKER` |
 | MediaPurpose | `PROFILE`, `CARD` |
 | MediaStatus | `PENDING`, `UPLOADED` |
-| AdPlacement | `HOME`, `DESK`, `MESSAGE_COMPLETE`, `UNLOCK`(편지지·소품 해제용) |
+| AdPlacement | `HOME`, `DESK`, `MESSAGE_COMPLETE`, `UNLOCK`(편지지·소품 해제용), `BANNER`(화면 중간 3:1 배너) |
 | AdEventType | `IMPRESSION`, `VIEW_STARTED`, `VIEW_COMPLETED`, `CLICK` |
 | ReactionType | `HEART`, `TEARY`, `CLAP` |
 | ReplyScope | `SINGLE`(이 편지만), `DAILY`(오늘 받은 편지 한 번에) |
@@ -733,7 +733,7 @@ S3 버킷은 프론트 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허
 
 `GET /api/public/ads?placement=DESK`
 
-`placement`: `HOME`, `DESK`, `MESSAGE_COMPLETE` (필수, 잘못된 값은 `400 INVALID_REQUEST`)
+`placement`: `HOME`, `DESK`, `MESSAGE_COMPLETE`, `UNLOCK`, `BANNER` (필수, 잘못된 값은 `400 INVALID_REQUEST`)
 
 현재 시간이 노출 기간 안에 있고 활성화된 광고만 배열로 반환합니다. 광고가 없으면 `[]`입니다.
 
