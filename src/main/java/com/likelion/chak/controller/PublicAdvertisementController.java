@@ -8,6 +8,7 @@ import com.likelion.chak.dto.AdvertisementEventRequest;
 import com.likelion.chak.dto.AdvertisementResponse;
 import com.likelion.chak.dto.EventRecordedResponse;
 import com.likelion.chak.dto.GuestSession;
+import com.likelion.chak.service.AdCreativeService;
 import com.likelion.chak.service.AdvertisementService;
 import com.likelion.chak.service.AuthService;
 import com.likelion.chak.service.GuestIdentityService;
@@ -15,7 +16,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -38,6 +41,7 @@ import java.util.List;
 public class PublicAdvertisementController {
 
     private final AdvertisementService advertisementService;
+    private final AdCreativeService adCreativeService;
     private final AuthService authService;
     private final GuestIdentityService guestIdentityService;
 
@@ -57,6 +61,17 @@ public class PublicAdvertisementController {
     public ResponseEntity<List<AdvertisementResponse>> getActive(
             @RequestParam("placement") AdPlacement placement) {
         return ResponseEntity.ok(advertisementService.getActive(placement));
+    }
+
+    /** 운영자가 올린 광고 이미지. 한 번 올린 이미지는 바뀌지 않아 오래 캐시한다. */
+    @GetMapping("/creatives/{creativeId}")
+    public ResponseEntity<byte[]> getCreative(@PathVariable("creativeId") Long creativeId) {
+        AdCreativeService.Creative creative = adCreativeService.get(creativeId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(creative.contentType()))
+                .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())
+                .header("X-Content-Type-Options", "nosniff")
+                .body(creative.data());
     }
 
     @PostMapping("/{advertisementId}/events")

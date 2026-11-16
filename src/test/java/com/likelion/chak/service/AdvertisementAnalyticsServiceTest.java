@@ -34,6 +34,14 @@ class AdvertisementAnalyticsServiceTest {
     @Autowired
     private GuestIdentityService guestIdentityService;
 
+    @Autowired
+    private AdSwitchService adSwitchService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void turnAdsOn() {
+        adSwitchService.set(true, null);
+    }
+
     @Test
     void activeAdvertisementAndEventsAreStoredAndCounted() {
         Long advertisementId = advertisementService.create(new AdvertisementRequest(

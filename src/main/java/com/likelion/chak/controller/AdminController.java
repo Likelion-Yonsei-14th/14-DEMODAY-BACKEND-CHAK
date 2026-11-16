@@ -60,6 +60,8 @@ public class AdminController {
     private final com.likelion.chak.service.PromotionInquiryService promotionInquiryService;
     private final com.likelion.chak.service.BenefitSubmissionService benefitSubmissionService;
     private final com.likelion.chak.service.PollService pollService;
+    private final com.likelion.chak.service.AdSwitchService adSwitchService;
+    private final com.likelion.chak.service.AdCreativeService adCreativeService;
 
     @GetMapping("/ads")
     public ResponseEntity<List<AdvertisementResponse>> getAdvertisements(
@@ -83,6 +85,39 @@ public class AdminController {
             @Valid @RequestBody AdvertisementRequest request) {
         authService.getAdmin(principal.userId());
         return ResponseEntity.ok(advertisementService.update(advertisementId, request));
+    }
+
+    /** 광고 전체 노출 스위치. 꺼져 있으면 등록된 광고가 있어도 사용자에게 보이지 않는다. */
+    @GetMapping("/ads/switch")
+    public ResponseEntity<com.likelion.chak.service.AdSwitchService.State> getAdSwitch(
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adSwitchService.state());
+    }
+
+    public record AdSwitchRequest(@jakarta.validation.constraints.NotNull Boolean enabled) {
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/ads/switch")
+    public ResponseEntity<com.likelion.chak.service.AdSwitchService.State> setAdSwitch(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @Valid @RequestBody AdSwitchRequest request) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adSwitchService.set(request.enabled(), principal.userId()));
+    }
+
+    public record AdCreativeUploaded(Long id, String path) {
+    }
+
+    /** 광고 이미지를 원본 그대로(본문 = 파일) 받는다. PNG·JPEG·WEBP·GIF, 1MB까지. */
+    @PostMapping(value = "/ads/creatives", consumes = {"image/png", "image/jpeg", "image/webp", "image/gif"})
+    public ResponseEntity<AdCreativeUploaded> uploadAdCreative(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestBody byte[] body) {
+        authService.getAdmin(principal.userId());
+        long id = adCreativeService.upload(body, principal.userId());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new AdCreativeUploaded(id, "/api/public/ads/creatives/" + id));
     }
 
     @GetMapping("/ads/{advertisementId}/metrics")

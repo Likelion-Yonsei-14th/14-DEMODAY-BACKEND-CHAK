@@ -34,9 +34,13 @@ public class AdvertisementService {
 
     private final AdvertisementRepository advertisementRepository;
     private final AdvertisementEventRepository advertisementEventRepository;
+    private final AdSwitchService adSwitchService;
 
     @Transactional(readOnly = true)
     public List<AdvertisementResponse> getActive(AdPlacement placement) {
+        if (!adSwitchService.isEnabled()) {
+            return List.of();
+        }
         Instant now = Instant.now();
         return advertisementRepository
                 .findAllByPlacementAndActiveTrueAndStartsAtLessThanEqualAndEndsAtGreaterThanOrderByIdDesc(
