@@ -59,6 +59,7 @@ public class AdminController {
     private final AdminAccessService adminAccessService;
     private final com.likelion.chak.service.PromotionInquiryService promotionInquiryService;
     private final com.likelion.chak.service.BenefitSubmissionService benefitSubmissionService;
+    private final com.likelion.chak.service.PollService pollService;
 
     @GetMapping("/ads")
     public ResponseEntity<List<AdvertisementResponse>> getAdvertisements(
@@ -213,6 +214,30 @@ public class AdminController {
             @PathVariable("inviteId") Long inviteId) {
         authService.getAdmin(principal.userId());
         return ResponseEntity.ok(adminAccessService.cancelInvite(principal.userId(), inviteId));
+    }
+
+    @GetMapping("/polls")
+    public ResponseEntity<List<com.likelion.chak.dto.PollDtos.AdminPollSummary>> getPolls(
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(pollService.adminList(Instant.now()));
+    }
+
+    @PostMapping("/polls")
+    public ResponseEntity<com.likelion.chak.dto.PollDtos.AdminPollSummary> createPoll(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @Valid @RequestBody com.likelion.chak.dto.PollDtos.AdminPollRequest request) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(pollService.create(request, Instant.now()));
+    }
+
+    @PatchMapping("/polls/{pollId}")
+    public ResponseEntity<com.likelion.chak.dto.PollDtos.AdminPollSummary> updatePoll(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable Long pollId,
+            @RequestBody com.likelion.chak.dto.PollDtos.AdminPollUpdate request) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(pollService.update(pollId, request, Instant.now()));
     }
 
     @GetMapping("/promotion-inquiries")

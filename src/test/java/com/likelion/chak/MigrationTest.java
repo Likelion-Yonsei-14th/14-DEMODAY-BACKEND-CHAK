@@ -34,6 +34,14 @@ class MigrationTest {
             rows.next();
             assertThat(rows.getInt(1)).isEqualTo(1);
         }
+        // 수능 당일 질문은 4교시가 끝난 16:40(한국 시각) = 07:40 UTC에 열리고, 처음 넣은 질문 13개는 선택지가 5개씩이다.
+        try (var connection = DriverManager.getConnection(url, "sa", "");
+             var rows = connection.createStatement().executeQuery(
+                     "SELECT opens_at, (SELECT COUNT(*) FROM poll_options) FROM polls WHERE slug = '2026-exam-korean'")) {
+            rows.next();
+            assertThat(rows.getString(1)).startsWith("2026-11-19 07:40");
+            assertThat(rows.getInt(2)).isEqualTo(13 * 5);
+        }
     }
 
     @Test
