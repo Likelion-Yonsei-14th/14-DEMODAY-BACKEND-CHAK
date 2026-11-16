@@ -166,7 +166,7 @@ traffic_events (user 또는 guest, FK 없는 resource_key)
 | title | VARCHAR(100) | |
 | creative_url | VARCHAR(1000) | 광고 이미지 URL |
 | destination_url | VARCHAR(1000) | 클릭 이동 URL |
-| placement | VARCHAR(30) | `HOME` `DESK` `MESSAGE_COMPLETE` |
+| placement | VARCHAR(30) | `HOME` `DESK` `MESSAGE_COMPLETE` `UNLOCK` `BANNER` |
 | starts_at, ends_at | DATETIME(6) | 노출 기간 |
 | active | BOOLEAN | DELETE API는 FALSE로 변경 |
 | created_at, updated_at | DATETIME(6) | |

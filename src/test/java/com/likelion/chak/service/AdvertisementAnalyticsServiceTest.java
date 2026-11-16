@@ -105,6 +105,21 @@ class AdvertisementAnalyticsServiceTest {
     }
 
     @Test
+    void bannerPlacementKeepsItsOwnAds() {
+        advertisementService.create(new AdvertisementRequest(
+                "배너 광고",
+                "https://cdn.example.com/banner.webp",
+                "https://example.com/banner",
+                AdPlacement.BANNER,
+                Instant.now().minusSeconds(60),
+                Instant.now().plusSeconds(3600),
+                true));
+
+        assertThat(advertisementService.getActive(AdPlacement.BANNER)).hasSize(1);
+        assertThat(advertisementService.getActive(AdPlacement.HOME)).isEmpty();
+    }
+
+    @Test
     void rejectsAdEventsWithoutSessionOrOutsideExposurePeriod() {
         Long inactiveAdvertisementId = advertisementService.create(new AdvertisementRequest(
                 "비활성 광고",
