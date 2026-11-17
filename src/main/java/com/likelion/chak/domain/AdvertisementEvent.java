@@ -59,6 +59,9 @@ public class AdvertisementEvent {
 
     private Long viewDurationMs;
 
+    @Column(length = 20)
+    private String region;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

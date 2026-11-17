@@ -13,7 +13,8 @@ public record AdvertisementResponse(
         AdPlacement placement,
         Instant startsAt,
         Instant endsAt,
-        boolean active) {
+        boolean active,
+        java.util.List<String> targetRegions) {
 
     public static AdvertisementResponse from(Advertisement advertisement) {
         return new AdvertisementResponse(
@@ -24,6 +25,7 @@ public record AdvertisementResponse(
                 advertisement.getPlacement(),
                 advertisement.getStartsAt(),
                 advertisement.getEndsAt(),
-                advertisement.isActive());
+                advertisement.isActive(),
+                advertisement.targetRegionList());
     }
 }

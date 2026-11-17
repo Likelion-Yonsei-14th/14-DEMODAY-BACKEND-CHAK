@@ -14,5 +14,13 @@ public record AdvertisementRequest(
         @NotNull AdPlacement placement,
         @NotNull Instant startsAt,
         @NotNull Instant endsAt,
-        boolean active) {
+        boolean active,
+        /** 대상 시·도 이름("서울", "경기"). 비우거나 없으면 전국. */
+        @Size(max = 17) java.util.List<@Size(max = 10) String> targetRegions) {
+
+    public AdvertisementRequest(
+            String title, String creativeUrl, String destinationUrl, AdPlacement placement,
+            Instant startsAt, Instant endsAt, boolean active) {
+        this(title, creativeUrl, destinationUrl, placement, startsAt, endsAt, active, null);
+    }
 }

@@ -963,11 +963,19 @@ POST  /api/admin/ads
 PATCH /api/admin/ads/{advertisementId}
 DELETE /api/admin/ads/{advertisementId}
 GET   /api/admin/ads/{advertisementId}/metrics?from={ISO_INSTANT}&to={ISO_INSTANT}
+GET   /api/admin/ads/summary
+GET   /api/admin/ads/{advertisementId}/report?from={ISO_INSTANT}&to={ISO_INSTANT}
 GET   /api/admin/ads/switch
 PUT   /api/admin/ads/switch
 POST  /api/admin/ads/creatives
 GET   /api/admin/analytics/summary?from={ISO_INSTANT}&to={ISO_INSTANT}
 ```
+
+광고 고르기: `GET /api/public/ads/serve?placement=BANNER[&geoCountry=KR&geoRegion=11]`은 이 사람에게 보여 줄 광고 하나를 주고, 없으면 `204`입니다. 게재 중·기간 안·대상 지역이 맞는 광고 중에서 (1) 이 사람이 오늘 덜 본 광고, (2) 지금까지 노출이 적은 광고, (3) 무작위 순으로 고릅니다. 계약이 광고마다 같은 노출 수이기 때문입니다. 위치는 호스팅 헤더를 먼저 쓰고 없으면 쿼리 값을 씁니다. 지역을 모르거나 해외면 전국 광고만 받습니다.
+
+광고 생성·수정 요청에 `targetRegions`(시·도 이름 배열, 예: `["서울","경기"]`)를 넣으면 그 지역에만 보입니다. 비우거나 빼면 전국입니다. 모르는 이름은 `400 INVALID_ADVERTISEMENT`.
+
+도달 보고: `GET /api/admin/ads/summary`는 광고별 지금까지의 `impressions`(노출), `reach`(본 사람 수: 회원 번호 또는 손님 쿠키 기준), `clicks`입니다. `GET /api/admin/ads/{id}/report`는 기간(비우면 처음부터 지금까지) 합계 `totals`와 한국 날짜별 `days`, 시·도별 `regions`를 줍니다. 노출·클릭 이벤트에는 접속 시·도 이름이 함께 저장됩니다(IP는 저장하지 않음).
 
 광고 전체 스위치: `GET`·`PUT /api/admin/ads/switch`의 본문은 `{ "enabled": true }`이고 응답은 `{ "enabled": true, "updatedAt": "..." }`입니다. 꺼져 있으면 `GET /api/public/ads`가 모든 지면에서 빈 목록을 돌려주고 해제용 광고 시청도 요구하지 않습니다. 처음에는 꺼져 있습니다(수능날 한 번에 엽니다).
 
