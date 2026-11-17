@@ -58,7 +58,7 @@ public class StoreOutreachService {
     }
 
     private void apply(StoreOutreach outreach, OutreachRequest request, UserAccount admin) {
-        outreach.update(request.storeName().strip(), blankToNull(request.category()), blankToNull(request.region()),
+        outreach.update(request.kind(), request.storeName().strip(), blankToNull(request.category()), blankToNull(request.region()),
                 request.channel(), blankToNull(request.contact()), blankToNull(request.assignee()), request.status(),
                 blankToNull(request.note()), request.lastContactedOn(), admin.getDisplayName());
     }

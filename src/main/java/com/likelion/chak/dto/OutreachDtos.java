@@ -15,6 +15,7 @@ public final class OutreachDtos {
     }
 
     public record OutreachRequest(
+            StoreOutreach.Kind kind,
             @NotBlank @Size(max = 100) String storeName,
             @Size(max = 50) String category,
             @Size(max = 50) String region,
@@ -28,6 +29,7 @@ public final class OutreachDtos {
 
     public record OutreachResponse(
             Long id,
+            StoreOutreach.Kind kind,
             String storeName,
             String category,
             String region,
@@ -42,7 +44,7 @@ public final class OutreachDtos {
             Instant updatedAt) {
 
         public static OutreachResponse from(StoreOutreach o) {
-            return new OutreachResponse(o.getId(), o.getStoreName(), o.getCategory(), o.getRegion(), o.getChannel(),
+            return new OutreachResponse(o.getId(), o.getKind(), o.getStoreName(), o.getCategory(), o.getRegion(), o.getChannel(),
                     o.getContact(), o.getAssignee(), o.getStatus(), o.getNote(), o.getLastContactedOn(),
                     o.getUpdatedByName(), o.getCreatedAt(), o.getUpdatedAt());
         }
