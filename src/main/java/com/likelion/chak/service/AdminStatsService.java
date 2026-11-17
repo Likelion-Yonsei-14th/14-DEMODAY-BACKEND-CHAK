@@ -1,5 +1,7 @@
 package com.likelion.chak.service;
 
+import com.likelion.chak.dto.AdminDtos.ActiveDay;
+import com.likelion.chak.dto.AdminDtos.ActiveUsersResponse;
 import com.likelion.chak.dto.AdminDtos.DailyStat;
 import com.likelion.chak.dto.AdminDtos.DailyStatsResponse;
 import com.likelion.chak.dto.AdminDtos.RegionStat;
@@ -124,6 +126,7 @@ public class AdminStatsService {
         Map<Key, Set<String>> visitors = new HashMap<>();
         Map<Key, Long> views = new TreeMap<>(Comparator.comparing(Key::country, Comparator.nullsFirst(String::compareTo))
                 .thenComparing(Key::region, Comparator.nullsFirst(String::compareTo)));
+        Map<Key, String> codes = new HashMap<>();
         long unknown = 0;
         long overseas = 0;
         for (Object[] row : trafficRepository.findPageViewsBetween(fromInstant, toInstant)) {
@@ -138,7 +141,9 @@ public class AdminStatsService {
                 overseas++;
                 continue;
             }
-            Key key = new Key(country, region);
+            // 강원(42·51)·전북(45·52)처럼 코드가 둘인 지역은 이름으로 묶어 한 줄로 보인다.
+            Key key = new Key(country, RegionNames.of(country, region));
+            if (region != null) codes.merge(key, region, (a, b) -> a.compareTo(b) <= 0 ? a : b);
             views.merge(key, 1L, Long::sum);
             String who = isLoadTestGuest(row) ? "test:" + row[6]
                     : row[1] != null ? "u" + row[1] : row[2] != null ? "g" + row[2] : null;
@@ -147,12 +152,60 @@ public class AdminStatsService {
             }
         }
         List<RegionStat> items = views.entrySet().stream()
-                .map(e -> new RegionStat(e.getKey().country(), e.getKey().region(),
-                        RegionNames.of(e.getKey().country(), e.getKey().region()),
+                .map(e -> new RegionStat(e.getKey().country(), codes.get(e.getKey()), e.getKey().region(),
                         visitors.getOrDefault(e.getKey(), Set.of()).size(), e.getValue()))
                 .sorted(Comparator.comparingLong(RegionStat::pageViews).reversed())
                 .toList();
         return new RegionStatsResponse(start, end, items, unknown, overseas);
+    }
+
+
+    /**
+     * 활성 사용자. 날짜마다 그날까지 1일(DAU)·7일(WAU)·30일(MAU) 동안 들어온 서로 다른 사람 수를 센다.
+     * 회원은 계정, 비회원은 브라우저 방문자 표시 기준이라 같은 사람이 기기를 바꾸면 비회원은 두 번 세어진다.
+     * 부하 테스트 방문과 TEST 계정은 빼고, 기간 전체의 순 방문자도 함께 돌려준다.
+     */
+    @Transactional(readOnly = true)
+    public ActiveUsersResponse active(LocalDate from, LocalDate to) {
+        LocalDate end = to == null ? LocalDate.now(KST) : to;
+        LocalDate start = from;
+        if (start == null) {
+            Instant first = trafficRepository.findFirstPageViewAt();
+            start = first == null ? end : day(first);
+            if (start.isBefore(end.minusDays(MAX_DAYS))) start = end.minusDays(MAX_DAYS);
+        }
+        validate(start, end);
+        LocalDate loadFrom = start.minusDays(29);
+
+        Map<LocalDate, Set<String>> byDay = new HashMap<>();
+        for (Object[] row : trafficRepository.findPageViewsBetween(
+                loadFrom.atStartOfDay(KST).toInstant(), end.plusDays(1).atStartOfDay(KST).toInstant())) {
+            if (row[7] == AuthProvider.TEST || isLoadTestGuest(row)) continue;
+            String who = row[1] != null ? "u" + row[1] : row[2] != null ? "g" + row[2] : null;
+            if (who != null) byDay.computeIfAbsent(day((Instant) row[0]), k -> new HashSet<>()).add(who);
+        }
+
+        List<ActiveDay> days = new ArrayList<>();
+        for (LocalDate day = start; !day.isAfter(end); day = day.plusDays(1)) {
+            Set<String> mau = window(byDay, day, 30);
+            long mauMembers = mau.stream().filter(w -> w.startsWith("u")).count();
+            days.add(new ActiveDay(day, window(byDay, day, 1).size(), window(byDay, day, 7).size(),
+                    mau.size(), mauMembers, mau.size() - mauMembers));
+        }
+        Set<String> all = new HashSet<>();
+        for (LocalDate day = start; !day.isAfter(end); day = day.plusDays(1)) {
+            all.addAll(byDay.getOrDefault(day, Set.of()));
+        }
+        long members = all.stream().filter(w -> w.startsWith("u")).count();
+        return new ActiveUsersResponse(start, end, all.size(), members, all.size() - members, days);
+    }
+
+    private static Set<String> window(Map<LocalDate, Set<String>> byDay, LocalDate last, int length) {
+        Set<String> result = new HashSet<>();
+        for (int i = 0; i < length; i++) {
+            result.addAll(byDay.getOrDefault(last.minusDays(i), Set.of()));
+        }
+        return result;
     }
 
     private static void validate(LocalDate start, LocalDate end) {

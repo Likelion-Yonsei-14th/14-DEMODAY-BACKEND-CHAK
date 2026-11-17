@@ -43,6 +43,9 @@ public interface TrafficEventRepository extends JpaRepository<TrafficEvent, Long
             @Param("country") String country,
             @Param("region") String region);
 
+    @Query("select min(event.createdAt) from TrafficEvent event where event.eventType = com.likelion.chak.domain.TrafficEventType.PAGE_VIEW")
+    Instant findFirstPageViewAt();
+
     /** 기간 안의 페이지 조회(접속자 통계용). 행: 시각, 회원 id, 비회원 id, 국가, 시·도, 리소스 종류, 이벤트 id, 로그인 제공자. */
     @Query("""
             select event.createdAt, event.user.id, event.guest.id, event.country, event.region,

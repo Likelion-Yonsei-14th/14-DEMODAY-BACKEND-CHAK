@@ -60,6 +60,14 @@ public final class AdminDtos {
             List<DailyStat> days) {
     }
 
+    /** 그날까지 1·7·30일 동안의 서로 다른 방문자 수. MAU는 회원·비회원으로 나눈다. */
+    public record ActiveDay(LocalDate date, long dau, long wau, long mau, long mauMembers, long mauGuests) {
+    }
+
+    public record ActiveUsersResponse(LocalDate from, LocalDate to, long rangeVisitors, long rangeMembers, long rangeGuests,
+                                      List<ActiveDay> days) {
+    }
+
     public record RegionStat(String country, String region, String regionName, long visitors, long pageViews) {
     }
 

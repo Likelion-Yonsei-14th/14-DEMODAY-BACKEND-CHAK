@@ -2,7 +2,10 @@ package com.likelion.chak.service;
 
 import java.util.Map;
 
-/** 접속 지역 코드를 사람이 읽는 이름으로 바꾼다. 모르는 코드는 원래 값을 그대로 보여준다. */
+/**
+ * 접속 지역 코드를 사람이 읽는 이름으로 바꾼다. 강원·전북처럼 특별자치도로 바뀌며 새 코드가 생긴 곳은 옛 코드와 같은 이름을 준다.
+ * 국내인데 모르는 코드는 "기타 (코드 N)"로, 해외는 원래 값을 그대로 보여준다.
+ */
 public final class RegionNames {
 
     /** ISO 3166-2:KR 시·도 코드(숫자 부분). */
@@ -28,6 +31,7 @@ public final class RegionNames {
             if (name != null) {
                 return name;
             }
+            return "기타 (코드 " + code + ")";
         }
         return region;
     }
