@@ -237,5 +237,15 @@ class AdminStatsServiceTest {
         assertThat(day.wau()).isGreaterThanOrEqualTo(day.dau());
         assertThat(day.mau()).isGreaterThanOrEqualTo(day.wau());
         assertThat(after.rangeVisitors() - before.rangeVisitors()).isEqualTo(2);
+
+        // 부하 테스트 방문도 대시보드 접속자와 같이 방문마다 한 명으로 센다.
+        GuestIdentity shared = guest();
+        for (int i = 0; i < 2; i++) {
+            analyticsService.record(null, shared, new TrafficEventRequest(UUID.randomUUID().toString(), TrafficEventType.PAGE_VIEW,
+                    "load-" + i, "/", null, "LOAD_TEST_GUEST", null, null));
+        }
+        var withLoad = statsService.active(today, today).days().get(0);
+        assertThat(withLoad.dau() - day.dau()).isEqualTo(2);
+        assertThat(withLoad.dau()).isEqualTo(statsService.daily(today, today).days().get(0).visitors());
     }
 }

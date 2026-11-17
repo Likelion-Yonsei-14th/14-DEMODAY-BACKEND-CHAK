@@ -163,7 +163,7 @@ public class AdminStatsService {
     /**
      * 활성 사용자. 날짜마다 그날까지 1일(DAU)·7일(WAU)·30일(MAU) 동안 들어온 서로 다른 사람 수를 센다.
      * 회원은 계정, 비회원은 브라우저 방문자 표시 기준이라 같은 사람이 기기를 바꾸면 비회원은 두 번 세어진다.
-     * 부하 테스트 방문과 TEST 계정은 빼고, 기간 전체의 순 방문자도 함께 돌려준다.
+     * 대시보드 접속자 수와 같은 기준으로 부하 테스트 방문(방문마다 한 명)과 TEST 계정도 세고, 기간 전체의 순 방문자도 함께 돌려준다.
      */
     @Transactional(readOnly = true)
     public ActiveUsersResponse active(LocalDate from, LocalDate to) {
@@ -180,8 +180,9 @@ public class AdminStatsService {
         Map<LocalDate, Set<String>> byDay = new HashMap<>();
         for (Object[] row : trafficRepository.findPageViewsBetween(
                 loadFrom.atStartOfDay(KST).toInstant(), end.plusDays(1).atStartOfDay(KST).toInstant())) {
-            if (row[7] == AuthProvider.TEST || isLoadTestGuest(row)) continue;
-            String who = row[1] != null ? "u" + row[1] : row[2] != null ? "g" + row[2] : null;
+            // 대시보드 접속자 수와 같은 기준: 부하 테스트 방문과 TEST 계정도 센다(대회 측정 기준).
+            String who = isLoadTestGuest(row) ? "gtest:" + row[6]
+                    : row[1] != null ? "u" + row[1] : row[2] != null ? "g" + row[2] : null;
             if (who != null) byDay.computeIfAbsent(day((Instant) row[0]), k -> new HashSet<>()).add(who);
         }
 
