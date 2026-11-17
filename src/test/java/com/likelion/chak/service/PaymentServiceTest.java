@@ -41,6 +41,7 @@ class PaymentServiceTest {
     @Autowired private PaymentService paymentService;
     @Autowired private UnlockService unlockService;
     @Autowired private AdvertisementService advertisementService;
+    @Autowired private AdSwitchService adSwitchService;
     @Autowired private DeskService deskService;
     @Autowired private MessageService messageService;
     @Autowired private GuestIdentityService guestIdentityService;
@@ -150,6 +151,7 @@ class PaymentServiceTest {
 
     @Test
     void unlockRequiresACompletedAdViewWhenAdsAreAvailable() {
+        adSwitchService.set(true, null);
         AdvertisementResponse ad = advertisementService.create(new AdvertisementRequest(
                 "해제 광고", "https://cdn.example.com/a.webp", "https://example.com",
                 AdPlacement.UNLOCK, Instant.parse("2020-01-01T00:00:00Z"), Instant.parse("2099-01-01T00:00:00Z"), true));

@@ -42,6 +42,13 @@ class MigrationTest {
             assertThat(rows.getString(1)).startsWith("2026-11-19 07:40");
             assertThat(rows.getInt(2)).isEqualTo(13 * 5);
         }
+        // 광고는 수능날 한 번에 연다. 처음에는 전체 스위치가 꺼져 있다.
+        try (var connection = DriverManager.getConnection(url, "sa", "");
+             var rows = connection.createStatement().executeQuery(
+                     "SELECT setting_value FROM app_settings WHERE setting_key = 'ads.enabled'")) {
+            assertThat(rows.next()).isTrue();
+            assertThat(rows.getString(1)).isEqualTo("false");
+        }
     }
 
     @Test

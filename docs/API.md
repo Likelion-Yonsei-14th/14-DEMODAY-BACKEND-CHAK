@@ -963,8 +963,15 @@ POST  /api/admin/ads
 PATCH /api/admin/ads/{advertisementId}
 DELETE /api/admin/ads/{advertisementId}
 GET   /api/admin/ads/{advertisementId}/metrics?from={ISO_INSTANT}&to={ISO_INSTANT}
+GET   /api/admin/ads/switch
+PUT   /api/admin/ads/switch
+POST  /api/admin/ads/creatives
 GET   /api/admin/analytics/summary?from={ISO_INSTANT}&to={ISO_INSTANT}
 ```
+
+광고 전체 스위치: `GET`·`PUT /api/admin/ads/switch`의 본문은 `{ "enabled": true }`이고 응답은 `{ "enabled": true, "updatedAt": "..." }`입니다. 꺼져 있으면 `GET /api/public/ads`가 모든 지면에서 빈 목록을 돌려주고 해제용 광고 시청도 요구하지 않습니다. 처음에는 꺼져 있습니다(수능날 한 번에 엽니다).
+
+광고 이미지 올리기: `POST /api/admin/ads/creatives`의 본문은 파일 그대로이고 `Content-Type`은 `image/png`·`image/jpeg`·`image/webp`·`image/gif` 중 하나입니다(1MB까지, 파일 앞부분으로 형식을 다시 확인). 응답 `201 { "id": 1, "path": "/api/public/ads/creatives/1" }`의 `path`를 사이트 주소와 합쳐 `creativeUrl`로 씁니다. 이미지는 `GET /api/public/ads/creatives/{id}`로 누구나 받을 수 있고 1년 캐시됩니다.
 
 광고 생성·수정 요청:
 

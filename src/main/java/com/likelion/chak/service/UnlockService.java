@@ -27,6 +27,7 @@ public class UnlockService {
 
     private final AdUnlockRepository unlockRepository;
     private final AdvertisementRepository advertisementRepository;
+    private final AdSwitchService adSwitchService;
     private final AdvertisementEventRepository eventRepository;
 
     @Transactional(readOnly = true)
@@ -58,6 +59,9 @@ public class UnlockService {
     }
 
     private void requireAdIfAvailable(CallerIdentity caller, String adSessionId) {
+        if (!adSwitchService.isEnabled()) {
+            return;
+        }
         Instant now = Instant.now();
         boolean inventory = !advertisementRepository
                 .findAllByPlacementAndActiveTrueAndStartsAtLessThanEqualAndEndsAtGreaterThanOrderByIdDesc(
