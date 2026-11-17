@@ -45,15 +45,17 @@ class StoreOutreachApiTest {
                         .content("{\"storeName\":\"" + store + "\",\"category\":\"오락·체험\",\"region\":\"홍대\",\"channel\":\"INSTAGRAM\",\"contact\":\"@escape\",\"assignee\":\"다은\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("TODO"))
+                .andExpect(jsonPath("$.kind").value("STORE"))
                 .andExpect(jsonPath("$.updatedByName").value("다은"))
                 .andReturn().getResponse().getContentAsString();
         String id = created.replaceAll(".*\"id\":(\\d+).*", "$1");
 
         mockMvc.perform(put("/api/admin/store-outreach/" + id).header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"storeName\":\"" + store + "\",\"channel\":\"PHONE\",\"contact\":\"02-123-4567\",\"status\":\"REPLIED\",\"note\":\"다음 주 통화\",\"lastContactedOn\":\"2026-11-17\"}"))
+                        .content("{\"kind\":\"BRAND\",\"storeName\":\"" + store + "\",\"channel\":\"PHONE\",\"contact\":\"02-123-4567\",\"status\":\"REPLIED\",\"note\":\"다음 주 통화\",\"lastContactedOn\":\"2026-11-17\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("REPLIED"))
+                .andExpect(jsonPath("$.kind").value("BRAND"))
                 .andExpect(jsonPath("$.lastContactedOn").value("2026-11-17"));
 
         mockMvc.perform(get("/api/admin/store-outreach").header("Authorization", auth))

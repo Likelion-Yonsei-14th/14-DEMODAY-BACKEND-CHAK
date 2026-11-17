@@ -19,11 +19,18 @@ public class StoreOutreach {
     public enum Channel { INSTAGRAM, PHONE, EMAIL, NAVER_TALK, WEBSITE, LINKEDIN, KAKAO, VISIT, OTHER }
 
     /** 연락 전 → 연락함 → 답장 옴 → 협의 중 → 합의 → 입금 완료. 거절·무응답은 끝난 상태다. */
+    /** 연락 대상. 매장 한 곳(STORE)인지, 본사와 이야기하는 브랜드(BRAND)인지. */
+    public enum Kind { STORE, BRAND }
+
     public enum Status { TODO, CONTACTED, REPLIED, NEGOTIATING, AGREED, PAID, REJECTED, NO_RESPONSE }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "target_kind", nullable = false, length = 10)
+    private Kind kind = Kind.STORE;
 
     @Column(nullable = false, length = 100)
     private String storeName;
@@ -67,8 +74,9 @@ public class StoreOutreach {
         this.channel = channel;
     }
 
-    public void update(String storeName, String category, String region, Channel channel, String contact,
+    public void update(Kind kind, String storeName, String category, String region, Channel channel, String contact,
                        String assignee, Status status, String note, LocalDate lastContactedOn, String updatedByName) {
+        this.kind = kind == null ? Kind.STORE : kind;
         this.storeName = storeName;
         this.category = category;
         this.region = region;
