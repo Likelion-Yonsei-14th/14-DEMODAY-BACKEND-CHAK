@@ -226,6 +226,15 @@ public class AdminController {
         return ResponseEntity.ok(adminStatsService.daily(from, to));
     }
 
+    @GetMapping("/stats/active")
+    public ResponseEntity<com.likelion.chak.dto.AdminDtos.ActiveUsersResponse> getActiveUsers(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(name = "from", required = false) java.time.LocalDate from,
+            @RequestParam(name = "to", required = false) java.time.LocalDate to) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adminStatsService.active(from, to));
+    }
+
     @GetMapping("/stats/regions")
     public ResponseEntity<RegionStatsResponse> getRegionStats(
             @AuthenticationPrincipal AuthenticatedUser principal,

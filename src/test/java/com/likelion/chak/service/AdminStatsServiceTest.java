@@ -184,7 +184,8 @@ class AdminStatsServiceTest {
     void regionNamesFallBackToTheRawCode() {
         assertThat(RegionNames.of("KR", "11")).isEqualTo("서울");
         assertThat(RegionNames.of("KR", "KR-41")).isEqualTo("경기");
-        assertThat(RegionNames.of("KR", "99")).isEqualTo("99");
+        assertThat(RegionNames.of("KR", "99")).isEqualTo("기타 (코드 99)");
+        assertThat(RegionNames.of("KR", "51")).isEqualTo(RegionNames.of("KR", "42"));
         assertThat(RegionNames.of("US", "CA")).isEqualTo("CA");
         assertThat(RegionNames.of("JP", null)).isEqualTo("JP");
         assertThat(RegionNames.of(null, null)).isEqualTo("알 수 없음");
@@ -196,5 +197,55 @@ class AdminStatsServiceTest {
         assertThat(AnalyticsService.Geo.fromHeaders("KOR", "<script>")).isNull();
         assertThat(AnalyticsService.Geo.fromHeaders(null, null)).isNull();
         assertThat(AnalyticsService.Geo.fromHeaders("KR", "x".repeat(60))).isEqualTo(new AnalyticsService.Geo("KR", null));
+    }
+
+    @Test
+    void regionsMergeOldAndNewProvinceCodesAndLabelUnknownCodes() {
+        GuestIdentity oldCode = guest();
+        GuestIdentity newCode = guest();
+        GuestIdentity odd = guest();
+        analyticsService.record(null, oldCode, pageView("/a"), new AnalyticsService.Geo("KR", "42"));
+        analyticsService.record(null, newCode, pageView("/a"), new AnalyticsService.Geo("KR", "51"));
+        analyticsService.record(null, odd, pageView("/a"), new AnalyticsService.Geo("KR", "22"));
+
+        LocalDate today = LocalDate.now(AdminStatsService.KST);
+        RegionStatsResponse regions = statsService.regions(today, today);
+
+        assertThat(regions.items().stream().filter(i -> "강원".equals(i.regionName())).count()).isEqualTo(1);
+        var gangwon = regions.items().stream().filter(i -> "강원".equals(i.regionName())).findFirst().orElseThrow();
+        assertThat(gangwon.visitors()).isGreaterThanOrEqualTo(2);
+        assertThat(regions.items()).anyMatch(i -> "기타 (코드 22)".equals(i.regionName()));
+    }
+
+    @Test
+    void activeUsersCountDistinctPeopleOverRollingWindows() {
+        UserAccount member = userRepository.save(UserAccount.createKakao("k-" + UUID.randomUUID(), "회원", null, null));
+        GuestIdentity guestA = guest();
+        LocalDate today = LocalDate.now(AdminStatsService.KST);
+        var before = statsService.active(today, today);
+
+        analyticsService.record(member, null, pageView("/home"));
+        analyticsService.record(member, null, pageView("/start"));
+        analyticsService.record(null, guestA, pageView("/home"));
+
+        var after = statsService.active(today, today);
+        var day = after.days().get(0);
+        var dayBefore = before.days().get(0);
+        assertThat(day.dau() - dayBefore.dau()).isEqualTo(2);
+        assertThat(day.mau() - dayBefore.mau()).isEqualTo(2);
+        assertThat(day.mauMembers() - dayBefore.mauMembers()).isEqualTo(1);
+        assertThat(day.wau()).isGreaterThanOrEqualTo(day.dau());
+        assertThat(day.mau()).isGreaterThanOrEqualTo(day.wau());
+        assertThat(after.rangeVisitors() - before.rangeVisitors()).isEqualTo(2);
+
+        // 부하 테스트 방문도 대시보드 접속자와 같이 방문마다 한 명으로 센다.
+        GuestIdentity shared = guest();
+        for (int i = 0; i < 2; i++) {
+            analyticsService.record(null, shared, new TrafficEventRequest(UUID.randomUUID().toString(), TrafficEventType.PAGE_VIEW,
+                    "load-" + i, "/", null, "LOAD_TEST_GUEST", null, null));
+        }
+        var withLoad = statsService.active(today, today).days().get(0);
+        assertThat(withLoad.dau() - day.dau()).isEqualTo(2);
+        assertThat(withLoad.dau()).isEqualTo(statsService.daily(today, today).days().get(0).visitors());
     }
 }
