@@ -62,6 +62,7 @@ public class AdminController {
     private final com.likelion.chak.service.PollService pollService;
     private final com.likelion.chak.service.AdSwitchService adSwitchService;
     private final com.likelion.chak.service.AdCreativeService adCreativeService;
+    private final com.likelion.chak.service.AdReportService adReportService;
     private final com.likelion.chak.service.StoreOutreachService storeOutreachService;
 
     @GetMapping("/ads")
@@ -119,6 +120,25 @@ public class AdminController {
         long id = adCreativeService.upload(body, principal.userId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new AdCreativeUploaded(id, "/api/public/ads/creatives/" + id));
+    }
+
+    /** 모든 광고의 지금까지 노출·도달(서로 다른 사람 수)·클릭. */
+    @GetMapping("/ads/summary")
+    public ResponseEntity<List<com.likelion.chak.service.AdReportService.Summary>> getAdSummaries(
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adReportService.summaries());
+    }
+
+    /** 한 광고의 기간 내 노출·도달·클릭과 날짜별·지역별 숫자(광고주 보고용). */
+    @GetMapping("/ads/{advertisementId}/report")
+    public ResponseEntity<com.likelion.chak.service.AdReportService.Report> getAdReport(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("advertisementId") Long advertisementId,
+            @RequestParam(name = "from", required = false) Instant from,
+            @RequestParam(name = "to", required = false) Instant to) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(adReportService.report(advertisementId, from, to));
     }
 
     @GetMapping("/ads/{advertisementId}/metrics")

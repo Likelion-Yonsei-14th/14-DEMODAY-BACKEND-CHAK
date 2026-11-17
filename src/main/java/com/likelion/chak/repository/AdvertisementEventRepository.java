@@ -30,10 +30,10 @@ public interface AdvertisementEventRepository extends JpaRepository<Advertisemen
     @Query(value = """
             INSERT INTO advertisement_events (
                 advertisement_id, user_id, guest_id, event_type, session_id,
-                view_duration_ms, created_at
+                view_duration_ms, region, created_at
             ) VALUES (
                 :advertisementId, :userId, :guestId, :eventType, :sessionId,
-                :viewDurationMs, CURRENT_TIMESTAMP(6)
+                :viewDurationMs, :region, CURRENT_TIMESTAMP(6)
             ) ON DUPLICATE KEY UPDATE id = id
             """, nativeQuery = true)
     int insertOrKeepExisting(
@@ -42,7 +42,8 @@ public interface AdvertisementEventRepository extends JpaRepository<Advertisemen
             @Param("guestId") Long guestId,
             @Param("eventType") String eventType,
             @Param("sessionId") String sessionId,
-            @Param("viewDurationMs") Long viewDurationMs);
+            @Param("viewDurationMs") Long viewDurationMs,
+            @Param("region") String region);
 
     @Query("""
             select event.eventType, count(event)
@@ -60,6 +61,33 @@ public interface AdvertisementEventRepository extends JpaRepository<Advertisemen
             group by event.eventType
             """)
     List<Object[]> countByAdvertisementAndEventTypeBetween(
+            @Param("advertisementId") Long advertisementId,
+            @Param("from") Instant from,
+            @Param("to") Instant to);
+
+    /** 한 사람(회원 또는 손님)이 since 이후 광고별로 본 노출 수. */
+    @Query("""
+            select event.advertisement.id, count(event)
+            from AdvertisementEvent event
+            where event.eventType = com.likelion.chak.domain.AdEventType.IMPRESSION
+              and (event.user.id = :userId or event.guest.id = :guestId)
+              and event.createdAt >= :since
+            group by event.advertisement.id
+            """)
+    List<Object[]> countImpressionsByViewerSince(
+            @Param("userId") Long userId,
+            @Param("guestId") Long guestId,
+            @Param("since") Instant since);
+
+    /** 보고서용 원자료: 종류, 회원 번호, 손님 번호, 시·도, 시각. */
+    @Query("""
+            select event.eventType, event.user.id, event.guest.id, event.region, event.createdAt
+            from AdvertisementEvent event
+            where event.advertisement.id = :advertisementId
+              and event.eventType in (com.likelion.chak.domain.AdEventType.IMPRESSION, com.likelion.chak.domain.AdEventType.CLICK)
+              and event.createdAt >= :from and event.createdAt < :to
+            """)
+    List<Object[]> findReportRows(
             @Param("advertisementId") Long advertisementId,
             @Param("from") Instant from,
             @Param("to") Instant to);

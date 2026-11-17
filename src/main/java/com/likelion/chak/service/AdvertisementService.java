@@ -91,6 +91,7 @@ public class AdvertisementService {
                 request.startsAt(),
                 request.endsAt(),
                 request.active());
+        advertisement.updateTargetRegions(targetRegions(request));
         return AdvertisementResponse.from(advertisementRepository.save(advertisement));
     }
 
@@ -107,6 +108,7 @@ public class AdvertisementService {
                 request.startsAt(),
                 request.endsAt(),
                 request.active());
+        advertisement.updateTargetRegions(targetRegions(request));
         return AdvertisementResponse.from(advertisement);
     }
 
@@ -123,6 +125,17 @@ public class AdvertisementService {
             UserAccount user,
             GuestIdentity guest,
             AdvertisementEventRequest request) {
+        return recordEvent(advertisementId, user, guest, request, null);
+    }
+
+    /** 노출·클릭을 남긴다. region은 시·도 이름(지역별 도달 보고용), 모르면 null. */
+    @Transactional
+    public EventRecordedResponse recordEvent(
+            Long advertisementId,
+            UserAccount user,
+            GuestIdentity guest,
+            AdvertisementEventRequest request,
+            String region) {
         Advertisement advertisement = find(advertisementId);
         String sessionId = normalize(request.sessionId());
         if (!advertisement.isEligible(Instant.now()) || sessionId == null) {
@@ -142,7 +155,8 @@ public class AdvertisementService {
                 guest == null ? null : guest.getId(),
                 request.eventType().name(),
                 sessionId,
-                request.viewDurationMs());
+                request.viewDurationMs(),
+                region);
         AdvertisementEvent saved = advertisementEventRepository
                 .findByAdvertisementIdAndEventTypeAndSessionId(
                         advertisementId, request.eventType(), sessionId)
@@ -153,6 +167,21 @@ public class AdvertisementService {
     private Advertisement find(Long advertisementId) {
         return advertisementRepository.findById(advertisementId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ADVERTISEMENT_NOT_FOUND));
+    }
+
+    /** 대상 시·도를 검사하고 중복을 없앤다. 모르는 이름이 있으면 거절한다. */
+    private List<String> targetRegions(AdvertisementRequest request) {
+        if (request.targetRegions() == null) {
+            return List.of();
+        }
+        List<String> regions = request.targetRegions().stream()
+                .map(region -> region == null ? "" : region.trim())
+                .distinct()
+                .toList();
+        if (regions.stream().anyMatch(region -> !AdRegions.isAllowed(region))) {
+            throw new CustomException(ErrorCode.INVALID_ADVERTISEMENT);
+        }
+        return AdRegions.NAMES.stream().filter(regions::contains).toList();
     }
 
     private void validatePeriod(AdvertisementRequest request) {

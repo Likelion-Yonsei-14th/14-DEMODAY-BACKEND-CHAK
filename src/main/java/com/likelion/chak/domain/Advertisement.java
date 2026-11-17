@@ -48,6 +48,10 @@ public class Advertisement {
     @Column(nullable = false)
     private boolean active;
 
+    /** 대상 시·도 이름을 쉼표로("서울,경기"). 비어 있으면 전국. */
+    @Column(name = "target_regions", length = 200)
+    private String targetRegions;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -91,6 +95,23 @@ public class Advertisement {
         this.startsAt = startsAt;
         this.endsAt = endsAt;
         this.active = active;
+    }
+
+    public void updateTargetRegions(java.util.List<String> regions) {
+        this.targetRegions = regions == null || regions.isEmpty() ? null : String.join(",", regions);
+    }
+
+    /** 대상 시·도 이름 목록. 비어 있으면 전국. */
+    public java.util.List<String> targetRegionList() {
+        return targetRegions == null || targetRegions.isBlank()
+                ? java.util.List.of()
+                : java.util.Arrays.stream(targetRegions.split(",")).map(String::trim).filter(r -> !r.isEmpty()).toList();
+    }
+
+    /** 이 지역 사람에게 보여 줄 수 있는지. 지역을 모르는 사람에게는 전국 광고만. */
+    public boolean targets(String regionName) {
+        java.util.List<String> regions = targetRegionList();
+        return regions.isEmpty() || (regionName != null && regions.contains(regionName));
     }
 
     public void deactivate() {
