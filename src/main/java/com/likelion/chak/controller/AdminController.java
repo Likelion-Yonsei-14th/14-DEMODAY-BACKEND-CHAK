@@ -62,6 +62,7 @@ public class AdminController {
     private final com.likelion.chak.service.PollService pollService;
     private final com.likelion.chak.service.AdSwitchService adSwitchService;
     private final com.likelion.chak.service.AdCreativeService adCreativeService;
+    private final com.likelion.chak.service.StoreOutreachService storeOutreachService;
 
     @GetMapping("/ads")
     public ResponseEntity<List<AdvertisementResponse>> getAdvertisements(
@@ -319,5 +320,38 @@ public class AdminController {
             @Valid @RequestBody com.likelion.chak.dto.BenefitDtos.StatusRequest request) {
         authService.getAdmin(principal.userId());
         return ResponseEntity.ok(benefitSubmissionService.changeStatus(principal.userId(), submissionId, request.status()));
+    }
+
+    @GetMapping("/store-outreach")
+    public ResponseEntity<List<com.likelion.chak.dto.OutreachDtos.OutreachResponse>> getStoreOutreach(
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(storeOutreachService.list());
+    }
+
+    @PostMapping("/store-outreach")
+    public ResponseEntity<com.likelion.chak.dto.OutreachDtos.OutreachResponse> createStoreOutreach(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @Valid @RequestBody com.likelion.chak.dto.OutreachDtos.OutreachRequest request) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(storeOutreachService.create(principal.userId(), request));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/store-outreach/{outreachId}")
+    public ResponseEntity<com.likelion.chak.dto.OutreachDtos.OutreachResponse> updateStoreOutreach(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("outreachId") Long outreachId,
+            @Valid @RequestBody com.likelion.chak.dto.OutreachDtos.OutreachRequest request) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(storeOutreachService.update(principal.userId(), outreachId, request));
+    }
+
+    @DeleteMapping("/store-outreach/{outreachId}")
+    public ResponseEntity<Void> deleteStoreOutreach(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("outreachId") Long outreachId) {
+        authService.getAdmin(principal.userId());
+        storeOutreachService.delete(principal.userId(), outreachId);
+        return ResponseEntity.noContent().build();
     }
 }
