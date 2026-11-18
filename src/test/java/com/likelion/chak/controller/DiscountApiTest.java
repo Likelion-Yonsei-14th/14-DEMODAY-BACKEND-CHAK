@@ -13,6 +13,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -67,7 +69,9 @@ class DiscountApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.updatedAt").value(not(nullValue())))
                 .andExpect(jsonPath("$.items[?(@.brand=='" + brand + "')].place").value("서울 송파"))
-                .andExpect(jsonPath("$.items[?(@.brand=='" + brand + "')].updatedByName").value(nullValue()));
+                // 필터는 목록을 돌려준다: 한 건이 있고, 그 이름 칸은 비어 있다.
+                .andExpect(jsonPath("$.items[?(@.brand=='" + brand + "')]").value(hasSize(1)))
+                .andExpect(jsonPath("$.items[?(@.brand=='" + brand + "')].updatedByName").value(everyItem(nullValue())));
 
         // 숨기면 사용자 목록에서 빠지고 어드민에는 남는다.
         mockMvc.perform(put("/api/admin/discounts/" + id).header("Authorization", auth)
