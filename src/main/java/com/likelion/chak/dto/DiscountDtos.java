@@ -1,6 +1,7 @@
 package com.likelion.chak.dto;
 
 import com.likelion.chak.domain.Discount;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -13,6 +14,16 @@ import java.util.List;
 public final class DiscountDtos {
 
     private DiscountDtos() {
+    }
+
+    /** 광고주마다 다른 이벤트 내용·조건·증정품 한 줄("증정" / "음료 1잔"). 탭·줄바꿈은 저장 구분자라 받지 않는다. */
+    public record DiscountExtra(
+            @NotBlank @Size(max = 20) @Pattern(regexp = "[^\\t\\r\\n]*", message = "추가 항목 이름에는 줄바꿈을 넣을 수 없어요.") String label,
+            @NotBlank @Size(max = 200) @Pattern(regexp = "[^\\t\\r\\n]*", message = "추가 항목 내용에는 줄바꿈을 넣을 수 없어요.") String value) {
+
+        static List<DiscountExtra> of(Discount d) {
+            return d.extraItems().stream().map(extra -> new DiscountExtra(extra.label(), extra.value())).toList();
+        }
     }
 
     public record DiscountRequest(
@@ -28,7 +39,8 @@ public final class DiscountDtos {
             LocalDate sourceDate,
             @Size(max = 30) String highlight,
             @Size(max = 10) List<@Size(max = 100) String> bring,
-            @Size(max = 20) String howTo,
+            @Size(max = 50) String howTo,
+            @Size(max = 8) List<@Valid DiscountExtra> extras,
             @Size(max = 200) String companions,
             @Size(max = 200) String branches,
             @Size(max = 500) @Pattern(regexp = "^(https?://.+)?$", message = "이미지는 http(s) 주소여야 해요.") String image,
@@ -51,6 +63,7 @@ public final class DiscountDtos {
             String highlight,
             List<String> bring,
             String howTo,
+            List<DiscountExtra> extras,
             String companions,
             String branches,
             String image,
@@ -63,15 +76,16 @@ public final class DiscountDtos {
         public static DiscountResponse forPublic(Discount d) {
             DiscountResponse r = from(d);
             return new DiscountResponse(r.id(), r.brand(), r.category(), r.benefit(), r.start(), r.end(), r.conditions(),
-                    r.area(), r.place(), r.sourceUrl(), r.sourceDate(), r.highlight(), r.bring(), r.howTo(),
+                    r.area(), r.place(), r.sourceUrl(), r.sourceDate(), r.highlight(), r.bring(), r.howTo(), r.extras(),
                     r.companions(), r.branches(), r.image(), r.imageSource(), r.visible(), null, r.updatedAt());
         }
 
         public static DiscountResponse from(Discount d) {
             return new DiscountResponse(d.getId(), d.getBrand(), d.getCategory(), d.getBenefit(), d.getStartDate(),
                     d.getEndDate(), d.getConditions(), d.getArea(), d.getPlace(), d.getSourceUrl(), d.getSourceDate(),
-                    d.getHighlight(), d.bringItems(), d.getHowTo(), d.getCompanions(), d.getBranches(), d.getImageUrl(),
-                    d.getImageSource(), d.isVisible(), d.getUpdatedByName(), d.getUpdatedAt());
+                    d.getHighlight(), d.bringItems(), d.getHowTo(), DiscountExtra.of(d), d.getCompanions(),
+                    d.getBranches(), d.getImageUrl(), d.getImageSource(), d.isVisible(), d.getUpdatedByName(),
+                    d.getUpdatedAt());
         }
     }
 

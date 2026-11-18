@@ -74,10 +74,16 @@ public class DiscountService {
     private void apply(Discount discount, DiscountRequest request, UserAccount admin) {
         List<String> bring = request.bring() == null ? List.of()
                 : request.bring().stream().filter(item -> item != null && !item.isBlank()).map(String::strip).toList();
+        // 이름·내용이 모두 빈 항목(목록 안의 null 포함)은 빼고, 앞뒤 공백을 지워 저장한다.
+        List<Discount.Extra> extras = request.extras() == null ? List.of()
+                : request.extras().stream()
+                        .filter(extra -> extra != null && !(isBlank(extra.label()) && isBlank(extra.value())))
+                        .map(extra -> new Discount.Extra(extra.label().strip(), extra.value().strip()))
+                        .toList();
         discount.update(request.brand().strip(), request.category().strip(), request.benefit().strip(), request.start(),
                 request.end(), blankToNull(request.conditions()), request.area().strip(), blankToNull(request.place()),
                 request.sourceUrl().strip(), request.sourceDate(), blankToNull(request.highlight()), bring,
-                blankToNull(request.howTo()), blankToNull(request.companions()), blankToNull(request.branches()),
+                blankToNull(request.howTo()), extras, blankToNull(request.companions()), blankToNull(request.branches()),
                 blankToNull(request.image()), blankToNull(request.imageSource()),
                 request.visible() == null || request.visible(), admin.getDisplayName());
     }
@@ -94,6 +100,10 @@ public class DiscountService {
 
     private Discount find(Long discountId) {
         return discountRepository.findById(discountId).orElseThrow(() -> new CustomException(ErrorCode.DISCOUNT_NOT_FOUND));
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private static String blankToNull(String value) {
