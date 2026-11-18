@@ -52,8 +52,12 @@ class StoreOutreachApiTest {
 
         mockMvc.perform(put("/api/admin/store-outreach/" + id).header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"kind\":\"BRAND\",\"storeName\":\"" + store + "\",\"channel\":\"PHONE\",\"contact\":\"02-123-4567\",\"status\":\"REPLIED\",\"note\":\"다음 주 통화\",\"lastContactedOn\":\"2026-11-17\"}"))
+                        .content("{\"kind\":\"BRAND\",\"storeName\":\"" + store + "\",\"channel\":\"PHONE\",\"contact\":\"02-123-4567\",\"status\":\"REPLIED\",\"note\":\"다음 주 통화\",\"lastContactedOn\":\"2026-11-17\",\"offerPrice\":79000,\"expectedProfit\":792000,\"unitPrice\":100000,\"proposalUrl\":\"https://www.chak.live/promotion/deck?d=abc\"}"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.offerPrice").value(79000))
+                .andExpect(jsonPath("$.expectedProfit").value(792000))
+                .andExpect(jsonPath("$.unitPrice").value(100000))
+                .andExpect(jsonPath("$.proposalUrl").value("https://www.chak.live/promotion/deck?d=abc"))
                 .andExpect(jsonPath("$.status").value("REPLIED"))
                 .andExpect(jsonPath("$.kind").value("BRAND"))
                 .andExpect(jsonPath("$.lastContactedOn").value("2026-11-17"));
@@ -64,6 +68,11 @@ class StoreOutreachApiTest {
 
         mockMvc.perform(post("/api/admin/store-outreach").header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"storeName\":\" \",\"channel\":\"PHONE\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/admin/store-outreach/" + id).header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"storeName\":\"" + store + "\",\"channel\":\"PHONE\",\"offerPrice\":-1}"))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(delete("/api/admin/store-outreach/" + id).header("Authorization", auth)).andExpect(status().isNoContent());
