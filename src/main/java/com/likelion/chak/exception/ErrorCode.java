@@ -23,6 +23,8 @@ public enum ErrorCode {
     TOO_MANY_FRIEND_DESKS(HttpStatus.CONFLICT, "TOO_MANY_FRIEND_DESKS", "아직 전달하지 않은 친구 책상이 너무 많습니다."),
     INQUIRY_NOT_FOUND(HttpStatus.NOT_FOUND, "INQUIRY_NOT_FOUND", "상담 신청을 찾을 수 없습니다."),
     OUTREACH_NOT_FOUND(HttpStatus.NOT_FOUND, "OUTREACH_NOT_FOUND", "연락 기록을 찾을 수 없습니다."),
+    DISCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "DISCOUNT_NOT_FOUND", "할인 혜택을 찾을 수 없습니다."),
+    INVALID_DISCOUNT_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_DISCOUNT_PERIOD", "시작일이 마지막 날보다 늦어요."),
     BENEFIT_NOT_FOUND(HttpStatus.NOT_FOUND, "BENEFIT_NOT_FOUND", "혜택 시안 신청을 찾을 수 없습니다."),
     INVALID_BENEFIT_ANSWER(HttpStatus.BAD_REQUEST, "INVALID_BENEFIT_ANSWER", "입력한 내용을 한 번만 더 확인해 주세요."),
     INVALID_UPLOAD_FILE(HttpStatus.BAD_REQUEST, "INVALID_UPLOAD_FILE", "올릴 수 없는 파일이에요. 형식과 크기를 확인해 주세요."),

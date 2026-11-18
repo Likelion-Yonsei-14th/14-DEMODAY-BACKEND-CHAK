@@ -64,6 +64,7 @@ public class AdminController {
     private final com.likelion.chak.service.AdCreativeService adCreativeService;
     private final com.likelion.chak.service.AdReportService adReportService;
     private final com.likelion.chak.service.StoreOutreachService storeOutreachService;
+    private final com.likelion.chak.service.DiscountService discountService;
 
     @GetMapping("/ads")
     public ResponseEntity<List<AdvertisementResponse>> getAdvertisements(
@@ -381,6 +382,39 @@ public class AdminController {
             @PathVariable("outreachId") Long outreachId) {
         authService.getAdmin(principal.userId());
         storeOutreachService.delete(principal.userId(), outreachId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/discounts")
+    public ResponseEntity<List<com.likelion.chak.dto.DiscountDtos.DiscountResponse>> getDiscounts(
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(discountService.listAll());
+    }
+
+    @PostMapping("/discounts")
+    public ResponseEntity<com.likelion.chak.dto.DiscountDtos.DiscountResponse> createDiscount(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @Valid @RequestBody com.likelion.chak.dto.DiscountDtos.DiscountRequest request) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(discountService.create(principal.userId(), request));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/discounts/{discountId}")
+    public ResponseEntity<com.likelion.chak.dto.DiscountDtos.DiscountResponse> updateDiscount(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("discountId") Long discountId,
+            @Valid @RequestBody com.likelion.chak.dto.DiscountDtos.DiscountRequest request) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(discountService.update(principal.userId(), discountId, request));
+    }
+
+    @DeleteMapping("/discounts/{discountId}")
+    public ResponseEntity<Void> deleteDiscount(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("discountId") Long discountId) {
+        authService.getAdmin(principal.userId());
+        discountService.delete(principal.userId(), discountId);
         return ResponseEntity.noContent().build();
     }
 }
