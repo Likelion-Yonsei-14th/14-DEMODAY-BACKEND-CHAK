@@ -60,6 +60,19 @@ public class StoreOutreach {
 
     private LocalDate lastContactedOn;
 
+    /** 매장에 제시한 광고비(원). */
+    private Integer offerPrice;
+
+    /** 제안서에 적은 매장의 예상 수익(원). */
+    private Integer expectedProfit;
+
+    /** 계산에 쓴 1회 방문 객단가(원). */
+    private Integer unitPrice;
+
+    /** 매장에 보낸 제안서 링크. */
+    @Column(length = 500)
+    private String proposalUrl;
+
     @Column(length = 50)
     private String updatedByName;
 
@@ -75,7 +88,8 @@ public class StoreOutreach {
     }
 
     public void update(Kind kind, String storeName, String category, String region, Channel channel, String contact,
-                       String assignee, Status status, String note, LocalDate lastContactedOn, String updatedByName) {
+                       String assignee, Status status, String note, LocalDate lastContactedOn, Integer offerPrice,
+                       Integer expectedProfit, Integer unitPrice, String proposalUrl, String updatedByName) {
         this.kind = kind == null ? Kind.STORE : kind;
         this.storeName = storeName;
         this.category = category;
@@ -86,6 +100,10 @@ public class StoreOutreach {
         this.status = status == null ? Status.TODO : status;
         this.note = note;
         this.lastContactedOn = lastContactedOn;
+        this.offerPrice = offerPrice;
+        this.expectedProfit = expectedProfit;
+        this.unitPrice = unitPrice;
+        this.proposalUrl = proposalUrl;
         this.updatedByName = updatedByName;
         this.updatedAt = Instant.now();
     }

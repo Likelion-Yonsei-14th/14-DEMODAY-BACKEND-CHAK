@@ -3,6 +3,7 @@ package com.likelion.chak.dto;
 import com.likelion.chak.domain.StoreOutreach;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
@@ -24,7 +25,11 @@ public final class OutreachDtos {
             @Size(max = 30) String assignee,
             StoreOutreach.Status status,
             @Size(max = 2000) String note,
-            LocalDate lastContactedOn) {
+            LocalDate lastContactedOn,
+            @PositiveOrZero Integer offerPrice,
+            @PositiveOrZero Integer expectedProfit,
+            @PositiveOrZero Integer unitPrice,
+            @Size(max = 500) String proposalUrl) {
     }
 
     public record OutreachResponse(
@@ -39,6 +44,10 @@ public final class OutreachDtos {
             StoreOutreach.Status status,
             String note,
             LocalDate lastContactedOn,
+            Integer offerPrice,
+            Integer expectedProfit,
+            Integer unitPrice,
+            String proposalUrl,
             String updatedByName,
             Instant createdAt,
             Instant updatedAt) {
@@ -46,6 +55,7 @@ public final class OutreachDtos {
         public static OutreachResponse from(StoreOutreach o) {
             return new OutreachResponse(o.getId(), o.getKind(), o.getStoreName(), o.getCategory(), o.getRegion(), o.getChannel(),
                     o.getContact(), o.getAssignee(), o.getStatus(), o.getNote(), o.getLastContactedOn(),
+                    o.getOfferPrice(), o.getExpectedProfit(), o.getUnitPrice(), o.getProposalUrl(),
                     o.getUpdatedByName(), o.getCreatedAt(), o.getUpdatedAt());
         }
     }
