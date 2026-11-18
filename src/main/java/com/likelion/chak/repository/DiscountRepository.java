@@ -13,6 +13,8 @@ public interface DiscountRepository extends JpaRepository<Discount, Long> {
 
     List<Discount> findAllByVisibleTrueOrderByIdAsc();
 
+    List<Discount> findAllByVisibleTrueAndSponsoredTrue();
+
     @Query("select max(d.updatedAt) from Discount d")
     Instant findLastUpdatedAt();
 }

@@ -90,6 +90,18 @@ public class Discount {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    /** 광고 계약한 매장 혜택. 목록 위에 따로 돌려 보여 주고 노출·클릭을 센다. */
+    @Column(nullable = false)
+    private boolean sponsored;
+
+    /** 지도에 찍을 매장 주소와 좌표(WGS84). 좌표가 없으면 지도에 나오지 않는다. */
+    @Column(length = 200)
+    private String address;
+
+    private Double latitude;
+
+    private Double longitude;
+
     public Discount(String brand) {
         this.brand = brand;
     }
@@ -120,6 +132,19 @@ public class Discount {
         this.visible = visible;
         this.updatedByName = updatedByName;
         this.updatedAt = Instant.now();
+    }
+
+    /** 제휴 광고 여부와 지도 위치. 좌표는 둘 다 있거나 둘 다 없다. */
+    public void updatePlacement(boolean sponsored, String address, Double latitude, Double longitude) {
+        this.sponsored = sponsored;
+        this.address = address;
+        boolean located = latitude != null && longitude != null;
+        this.latitude = located ? latitude : null;
+        this.longitude = located ? longitude : null;
+    }
+
+    public boolean hasLocation() {
+        return latitude != null && longitude != null;
     }
 
     public List<String> bringItems() {

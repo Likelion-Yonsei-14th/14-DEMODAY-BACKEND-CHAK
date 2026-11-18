@@ -65,6 +65,7 @@ public class AdminController {
     private final com.likelion.chak.service.AdReportService adReportService;
     private final com.likelion.chak.service.StoreOutreachService storeOutreachService;
     private final com.likelion.chak.service.DiscountService discountService;
+    private final com.likelion.chak.service.DiscountAdService discountAdService;
 
     @GetMapping("/ads")
     public ResponseEntity<List<AdvertisementResponse>> getAdvertisements(
@@ -383,6 +384,14 @@ public class AdminController {
         authService.getAdmin(principal.userId());
         storeOutreachService.delete(principal.userId(), outreachId);
         return ResponseEntity.noContent().build();
+    }
+
+    /** 혜택함 제휴 광고 집계: 노출 횟수·본 사람·클릭 횟수·클릭한 사람. */
+    @GetMapping("/discounts/stats")
+    public ResponseEntity<List<com.likelion.chak.dto.DiscountDtos.DiscountAdStat>> getDiscountStats(
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(discountAdService.stats());
     }
 
     @GetMapping("/discounts")
