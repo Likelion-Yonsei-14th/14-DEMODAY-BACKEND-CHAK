@@ -90,7 +90,7 @@ public class PublicAdvertisementController {
     }
 
     /** 헤더(프론트 미들웨어 → 호스팅) 순으로 국가·시도를 읽고, 없으면 요청에 실린 값을 쓴다. 시·도 이름 또는 null. */
-    private static String regionOf(HttpServletRequest http, String fallbackCountry, String fallbackRegion) {
+    static String regionOf(HttpServletRequest http, String fallbackCountry, String fallbackRegion) {
         String country = firstNonBlank(http.getHeader("X-Chak-Geo-Country"), http.getHeader("X-Vercel-IP-Country"));
         String region = firstNonBlank(http.getHeader("X-Chak-Geo-Region"), http.getHeader("X-Vercel-IP-Country-Region"));
         if (country == null && region == null) {

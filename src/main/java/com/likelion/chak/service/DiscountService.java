@@ -86,6 +86,8 @@ public class DiscountService {
                 blankToNull(request.howTo()), extras, blankToNull(request.companions()), blankToNull(request.branches()),
                 blankToNull(request.image()), blankToNull(request.imageSource()),
                 request.visible() == null || request.visible(), admin.getDisplayName());
+        discount.updatePlacement(Boolean.TRUE.equals(request.sponsored()), blankToNull(request.address()),
+                request.latitude(), request.longitude());
     }
 
     private static void validateDates(DiscountRequest request) {
