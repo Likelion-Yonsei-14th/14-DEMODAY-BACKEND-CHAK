@@ -49,6 +49,14 @@ class MigrationTest {
             assertThat(rows.next()).isTrue();
             assertThat(rows.getString(1)).isEqualTo("false");
         }
+        // 혜택함: 프론트에 있던 53건을 옮겨 오고, 챙길 것은 한 줄에 하나씩이다.
+        try (var connection = DriverManager.getConnection(url, "sa", "");
+             var rows = connection.createStatement().executeQuery(
+                     "SELECT (SELECT COUNT(*) FROM discounts WHERE visible = TRUE), bring FROM discounts WHERE brand = '에버랜드'")) {
+            assertThat(rows.next()).isTrue();
+            assertThat(rows.getInt(1)).isEqualTo(53);
+            assertThat(rows.getString(2).split("\n")).hasSize(2);
+        }
     }
 
     @Test
