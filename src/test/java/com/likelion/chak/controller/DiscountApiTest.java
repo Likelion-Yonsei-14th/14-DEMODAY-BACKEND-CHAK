@@ -101,4 +101,56 @@ class DiscountApiTest {
         mockMvc.perform(delete("/api/admin/discounts/" + id).header("Authorization", auth)).andExpect(status().isNoContent());
         mockMvc.perform(delete("/api/admin/discounts/" + id).header("Authorization", auth)).andExpect(status().isNotFound());
     }
+
+    @Test
+    void extrasCarryEachAdvertisersOwnTerms() throws Exception {
+        UserAccount admin = userRepository.save(UserAccount.createKakao("k-" + UUID.randomUUID(), "다은", null, null));
+        admin.updateAdmin(true);
+        userRepository.save(admin);
+        String auth = "Bearer " + jwt.createAccessToken(admin);
+        String brand = "카페" + UUID.randomUUID().toString().substring(0, 6);
+        String extras = ",\"howTo\":\"네이버 예약 후 방문하면 바로 적용\""
+                + ",\"extras\":[{\"label\":\" 증정 \",\"value\":\" 음료 1잔 \"},null,"
+                + "{\"label\":\"이용 시간\",\"value\":\"평일 11시~17시\"}]";
+
+        // 저장: 빈 항목은 빠지고 앞뒤 공백은 지워진다. 받는 방법은 50자까지 자유롭게.
+        String created = mockMvc.perform(post("/api/admin/discounts").header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON).content(body(brand, true, extras)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.howTo").value("네이버 예약 후 방문하면 바로 적용"))
+                .andExpect(jsonPath("$.extras.length()").value(2))
+                .andExpect(jsonPath("$.extras[0].label").value("증정"))
+                .andExpect(jsonPath("$.extras[0].value").value("음료 1잔"))
+                .andExpect(jsonPath("$.extras[1].label").value("이용 시간"))
+                .andReturn().getResponse().getContentAsString();
+        String id = created.replaceAll(".*\"id\":(\\d+).*", "$1");
+
+        // 사용자 목록에도 같은 순서로 나온다.
+        mockMvc.perform(get("/api/public/discounts"))
+                .andExpect(jsonPath("$.items[?(@.brand=='" + brand + "')].extras[0].value").value("음료 1잔"))
+                .andExpect(jsonPath("$.items[?(@.brand=='" + brand + "')].extras[1].value").value("평일 11시~17시"));
+
+        // 항목을 비우면 빈 목록, 숨기면 사용자 목록에서 빠진다.
+        mockMvc.perform(put("/api/admin/discounts/" + id).header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON).content(body(brand, false, ",\"extras\":[]")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.extras").value(empty()));
+        mockMvc.perform(get("/api/public/discounts"))
+                .andExpect(jsonPath("$.items[?(@.brand=='" + brand + "')]").value(empty()));
+
+        // 줄바꿈·탭(저장 구분자), 한쪽만 빈 항목, 9개 이상은 받지 않는다.
+        for (String bad : new String[] {
+                "[{\"label\":\"증정\",\"value\":\"음료\\n1잔\"}]",
+                "[{\"label\":\"증\\t정\",\"value\":\"음료 1잔\"}]",
+                "[{\"label\":\"증정\",\"value\":\" \"}]",
+                "[" + String.join(",", java.util.Collections.nCopies(9, "{\"label\":\"a\",\"value\":\"b\"}")) + "]"}) {
+            mockMvc.perform(put("/api/admin/discounts/" + id).header("Authorization", auth)
+                            .contentType(MediaType.APPLICATION_JSON).content(body(brand, true, ",\"extras\":" + bad)))
+                    .andExpect(status().isBadRequest());
+        }
+        mockMvc.perform(put("/api/admin/discounts/" + id).header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(brand, true, ",\"howTo\":\"" + "가".repeat(51) + "\"")))
+                .andExpect(status().isBadRequest());
+    }
 }
