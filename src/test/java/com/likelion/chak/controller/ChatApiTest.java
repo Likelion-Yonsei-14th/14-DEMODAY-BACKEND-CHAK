@@ -99,6 +99,22 @@ class ChatApiTest {
     }
 
     @Test
+    void scheduleQuestionsGetNoDiscounts() throws Exception {
+        String tag = "신촌" + System.nanoTime();
+        discount("제휴" + tag, tag, true, LocalDate.of(2099, 1, 1));
+        when(liner.complete(contains("질문 분류기"), any(), anyInt())).thenReturn(
+                "{\"onTopic\":true,\"searchQuery\":\"정시 원서 접수\",\"wantsDiscounts\":false,\"keywords\":[\"" + tag + "\"]}");
+        when(liner.search(anyString(), any(), anyInt())).thenReturn(List.of());
+        when(liner.complete(contains("수능 도우미"), any(), anyInt())).thenReturn("원서는 12월 말이에요");
+
+        mockMvc.perform(post("/api/public/chat").header("X-Forwarded-For", ip()).contentType(MediaType.APPLICATION_JSON)
+                        .content(ask("정시 원서 언제 내?")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.discounts.length()").value(0))
+                .andExpect(jsonPath("$.sources[0].hostname").value("www.suneung.re.kr"));
+    }
+
+    @Test
     void oneVisitorCannotAskTooMuch() throws Exception {
         when(liner.complete(contains("질문 분류기"), any(), anyInt()))
                 .thenReturn("{\"onTopic\":false,\"searchQuery\":\"\",\"wantsDiscounts\":false,\"keywords\":[]}");
