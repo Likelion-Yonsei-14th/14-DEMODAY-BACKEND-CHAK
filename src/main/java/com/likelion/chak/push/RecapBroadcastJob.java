@@ -2,6 +2,7 @@ package com.likelion.chak.push;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -33,6 +34,7 @@ public class RecapBroadcastJob {
     private final JdbcTemplate jdbc;
     private final Clock clock;
 
+    @Autowired
     public RecapBroadcastJob(PushService pushService, PushSubscriptionRepository repository, PushNotifier notifier,
                              JdbcTemplate jdbc) {
         this(pushService, repository, notifier, jdbc, Clock.systemUTC());
