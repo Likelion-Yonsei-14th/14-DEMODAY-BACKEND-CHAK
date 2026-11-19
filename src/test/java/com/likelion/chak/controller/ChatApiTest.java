@@ -111,11 +111,12 @@ class ChatApiTest {
         discounts.save(climbing);
         when(liner.complete(contains("질문 분류기"), any(), anyInt())).thenReturn(
                 "{\"onTopic\":true,\"searchQuery\":\"\",\"wantsDiscounts\":true,\"keywords\":[\"서울\",\"" + tag + "\",\"할인\"]}");
-        when(liner.complete(contains("수능 도우미"), any(), anyInt())).thenReturn("카페 혜택이에요");
+        when(liner.complete(contains("수능 도우미"), any(), anyInt())).thenReturn("[착 혜택]에 있는 카페 혜택이에요");
 
         mockMvc.perform(post("/api/public/chat").header("X-Forwarded-For", ip()).contentType(MediaType.APPLICATION_JSON)
                         .content(ask("서울 카페 할인")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer").value("착 혜택함에 있는 카페 혜택이에요"))
                 .andExpect(jsonPath("$.discounts.length()").value(2))
                 .andExpect(jsonPath("$.discounts[?(@.brand =~ /클라이밍.*/)]").isEmpty())
                 .andExpect(jsonPath("$.discounts[?(@.brand =~ /부산.*/)]").isEmpty());
