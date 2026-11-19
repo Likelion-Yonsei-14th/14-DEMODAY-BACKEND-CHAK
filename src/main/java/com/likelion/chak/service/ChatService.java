@@ -139,18 +139,22 @@ public class ChatService {
     }
 
     /**
-     * 혜택을 직접 물었을 때만 고른다(성적·일정 질문에 광고를 끼우지 않는다). 낱말이 모두 맞는 혜택만 고른다
+     * 혜택을 직접 물었을 때만 고른다(성적·일정 질문에 광고를 끼우지 않는다). 지역과 업종이 함께 맞는 혜택만 고른다
      * ("서울 카페"면 서울(또는 전국)이면서 카페인 곳). 지역 낱말은 '전국' 혜택도 맞는 것으로 본다.
      * 낱말이 없으면("혜택 뭐 있어?") 제휴 매장 먼저, 마감이 가까운 순. 낱말이 있는데 맞는 게 없으면 아무것도 안 보여 준다.
      */
     List<Discount> pickDiscounts(Plan plan, LocalDate today) {
         if (!plan.wantsDiscounts()) return List.of();
         List<String> keywords = plan.keywords().stream().map(ChatService::cleanKeyword).filter(k -> !k.isEmpty()).toList();
+        // 지역 낱말은 모두 맞아야 하고, 업종·브랜드 낱말("음식점", "식당")은 비슷한 말이 함께 오므로 하나만 맞으면 된다.
+        List<String> areas = keywords.stream().filter(AREA_WORDS::contains).toList();
+        List<String> kinds = keywords.stream().filter(k -> !AREA_WORDS.contains(k)).toList();
         Comparator<Discount> order = Comparator.comparing((Discount d) -> !d.isSponsored())
                 .thenComparing(d -> d.getEndDate() == null ? LocalDate.MAX : d.getEndDate());
         return discounts.findAllByVisibleTrueOrderByIdAsc().stream()
                 .filter(d -> d.getEndDate() == null || !d.getEndDate().isBefore(today))
-                .filter(d -> keywords.stream().allMatch(k -> matches(d, k)))
+                .filter(d -> areas.stream().allMatch(k -> matches(d, k)))
+                .filter(d -> kinds.isEmpty() || kinds.stream().anyMatch(k -> matches(d, k)))
                 .sorted(order)
                 .limit(MAX_DISCOUNTS)
                 .toList();

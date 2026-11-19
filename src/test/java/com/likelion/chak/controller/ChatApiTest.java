@@ -127,7 +127,7 @@ class ChatApiTest {
         String tag = "식당" + System.nanoTime();
         discount(tag, "전국", false, LocalDate.of(2099, 1, 1));
         when(liner.complete(contains("질문 분류기"), any(), anyInt())).thenReturn(
-                "{\"onTopic\":true,\"searchQuery\":\"\",\"wantsDiscounts\":true,\"keywords\":[\"수험표 할인 음식점\", \"할인\"]}");
+                "{\"onTopic\":true,\"searchQuery\":\"\",\"wantsDiscounts\":true,\"keywords\":[\"수험표 할인 음식점\", \"식당\", \"할인\"]}");
         when(liner.complete(contains("수능 도우미"), any(), anyInt())).thenReturn("있어요");
 
         mockMvc.perform(post("/api/public/chat").header("X-Forwarded-For", ip()).contentType(MediaType.APPLICATION_JSON)
