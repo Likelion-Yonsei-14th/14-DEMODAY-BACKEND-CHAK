@@ -145,7 +145,7 @@ public class ChatService {
      */
     List<Discount> pickDiscounts(Plan plan, LocalDate today) {
         if (!plan.wantsDiscounts()) return List.of();
-        List<String> keywords = plan.keywords().stream().filter(k -> !GENERIC_WORDS.contains(k)).toList();
+        List<String> keywords = plan.keywords().stream().map(ChatService::cleanKeyword).filter(k -> !k.isEmpty()).toList();
         Comparator<Discount> order = Comparator.comparing((Discount d) -> !d.isSponsored())
                 .thenComparing(d -> d.getEndDate() == null ? LocalDate.MAX : d.getEndDate());
         return discounts.findAllByVisibleTrueOrderByIdAsc().stream()
@@ -154,6 +154,14 @@ public class ChatService {
                 .sorted(order)
                 .limit(MAX_DISCOUNTS)
                 .toList();
+    }
+
+    /** "수험표 할인 음식점"처럼 일반 낱말이 붙어 오면 떼어 낸다. 지역은 그대로 둔다. */
+    static String cleanKeyword(String keyword) {
+        String k = keyword.strip();
+        if (AREA_WORDS.contains(k)) return k;
+        for (String generic : GENERIC_WORDS) k = k.replace(generic, " ");
+        return k.replaceAll("\\s+", "").strip();
     }
 
     private static boolean matches(Discount d, String keyword) {
