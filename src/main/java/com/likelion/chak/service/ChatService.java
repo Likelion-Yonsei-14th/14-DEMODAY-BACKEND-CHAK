@@ -166,6 +166,12 @@ public class ChatService {
         for (String field : new String[]{d.getBrand(), d.getCategory(), d.getBenefit(), d.getPlace(), d.getBranches()}) {
             if (field != null && field.toLowerCase(Locale.ROOT).contains(k)) return true;
         }
+        // "음식점"·"영화관"·"미용실"처럼 분류 낱말(음식, 영화, 미용 …)을 품은 말도 그 분류로 본다.
+        if (d.getCategory() != null) {
+            for (String part : d.getCategory().split("·")) {
+                if (part.length() >= 2 && k.contains(part.toLowerCase(Locale.ROOT))) return true;
+            }
+        }
         return false;
     }
 
