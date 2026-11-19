@@ -65,6 +65,7 @@ public class AdminController {
     private final com.likelion.chak.service.AdReportService adReportService;
     private final com.likelion.chak.service.StoreOutreachService storeOutreachService;
     private final com.likelion.chak.service.DiscountService discountService;
+    private final com.likelion.chak.service.DiscountCollector discountCollector;
     private final com.likelion.chak.service.DiscountAdService discountAdService;
 
     @GetMapping("/ads")
@@ -392,6 +393,14 @@ public class AdminController {
             @AuthenticationPrincipal AuthenticatedUser principal) {
         authService.getAdmin(principal.userId());
         return ResponseEntity.ok(discountAdService.stats());
+    }
+
+    /** 웹에서 새 수험생 혜택 후보를 지금 찾아 숨김으로 넣는다(매일 10시·16시에도 자동으로 돈다). */
+    @PostMapping("/discounts/collect")
+    public ResponseEntity<com.likelion.chak.service.DiscountCollector.Result> collectDiscounts(
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        authService.getAdmin(principal.userId());
+        return ResponseEntity.ok(discountCollector.collect());
     }
 
     @GetMapping("/discounts")
