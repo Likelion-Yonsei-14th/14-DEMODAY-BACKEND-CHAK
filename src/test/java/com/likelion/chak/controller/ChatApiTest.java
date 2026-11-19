@@ -99,6 +99,29 @@ class ChatApiTest {
     }
 
     @Test
+    void everyWordMustMatchSoOtherKindsOfStoresAreNotShown() throws Exception {
+        String tag = "카페" + System.nanoTime();
+        discount("서울" + tag, "서울", false, LocalDate.of(2099, 1, 1));
+        discount("전국" + tag, "전국", false, LocalDate.of(2099, 1, 1));
+        discount("부산" + tag, "부산", true, LocalDate.of(2099, 1, 1));
+        Discount climbing = new Discount("클라이밍" + System.nanoTime());
+        climbing.update(climbing.getBrand(), "놀이·체험", "대여 할인", null, null, "", "서울", "", "https://x.example/c",
+                null, null, List.of(), null, List.of(), null, null, null, null, true, "테스트");
+        climbing.updatePlacement(true, null, null, null);
+        discounts.save(climbing);
+        when(liner.complete(contains("질문 분류기"), any(), anyInt())).thenReturn(
+                "{\"onTopic\":true,\"searchQuery\":\"\",\"wantsDiscounts\":true,\"keywords\":[\"서울\",\"" + tag + "\",\"할인\"]}");
+        when(liner.complete(contains("수능 도우미"), any(), anyInt())).thenReturn("카페 혜택이에요");
+
+        mockMvc.perform(post("/api/public/chat").header("X-Forwarded-For", ip()).contentType(MediaType.APPLICATION_JSON)
+                        .content(ask("서울 카페 할인")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.discounts.length()").value(2))
+                .andExpect(jsonPath("$.discounts[?(@.brand =~ /클라이밍.*/)]").isEmpty())
+                .andExpect(jsonPath("$.discounts[?(@.brand =~ /부산.*/)]").isEmpty());
+    }
+
+    @Test
     void scheduleQuestionsGetNoDiscounts() throws Exception {
         String tag = "신촌" + System.nanoTime();
         discount("제휴" + tag, tag, true, LocalDate.of(2099, 1, 1));
