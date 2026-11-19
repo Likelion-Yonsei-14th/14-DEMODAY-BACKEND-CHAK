@@ -100,7 +100,7 @@ class ChatApiTest {
 
     @Test
     void everyWordMustMatchSoOtherKindsOfStoresAreNotShown() throws Exception {
-        String tag = "카페" + System.nanoTime();
+        String tag = "망고" + System.nanoTime();
         discount("서울" + tag, "서울", false, LocalDate.of(2099, 1, 1));
         discount("전국" + tag, "전국", false, LocalDate.of(2099, 1, 1));
         discount("부산" + tag, "부산", true, LocalDate.of(2099, 1, 1));
@@ -120,6 +120,20 @@ class ChatApiTest {
                 .andExpect(jsonPath("$.discounts.length()").value(2))
                 .andExpect(jsonPath("$.discounts[?(@.brand =~ /클라이밍.*/)]").isEmpty())
                 .andExpect(jsonPath("$.discounts[?(@.brand =~ /부산.*/)]").isEmpty());
+    }
+
+    @Test
+    void everydayWordsFindTheirCategory() throws Exception {
+        String tag = "식당" + System.nanoTime();
+        discount(tag, "전국", false, LocalDate.of(2099, 1, 1));
+        when(liner.complete(contains("질문 분류기"), any(), anyInt())).thenReturn(
+                "{\"onTopic\":true,\"searchQuery\":\"\",\"wantsDiscounts\":true,\"keywords\":[\"음식점\"]}");
+        when(liner.complete(contains("수능 도우미"), any(), anyInt())).thenReturn("있어요");
+
+        mockMvc.perform(post("/api/public/chat").header("X-Forwarded-For", ip()).contentType(MediaType.APPLICATION_JSON)
+                        .content(ask("음식점 할인 알려줘")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.discounts[?(@.brand == '" + tag + "')]").isNotEmpty());
     }
 
     @Test
