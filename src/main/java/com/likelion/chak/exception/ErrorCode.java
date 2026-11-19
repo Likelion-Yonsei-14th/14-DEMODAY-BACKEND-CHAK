@@ -82,6 +82,8 @@ public enum ErrorCode {
     POLL_NOT_OPEN(HttpStatus.CONFLICT, "POLL_NOT_OPEN", "지금은 투표할 수 없는 질문이에요."),
     INVALID_POLL_OPTION(HttpStatus.BAD_REQUEST, "INVALID_POLL_OPTION", "선택지가 올바르지 않습니다."),
     INVALID_POLL(HttpStatus.BAD_REQUEST, "INVALID_POLL", "질문은 1~120자, 선택지는 2~6개(각 1~40자), 여는 시각이 닫는 시각보다 앞서야 합니다."),
+    TOO_MANY_CHATS(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_CHATS", "질문이 너무 많아요. 잠시 후 다시 물어봐 주세요."),
+    CHAT_NOT_AVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "CHAT_NOT_AVAILABLE", "수능 도우미가 잠시 쉬고 있어요. 잠시 후 다시 시도해주세요."),
     TOO_MANY_VOTES(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_VOTES", "투표가 너무 많아요. 잠시 후 다시 시도해주세요."),
     INVALID_EXAM_CAREER_RUN(HttpStatus.BAD_REQUEST, "INVALID_EXAM_CAREER_RUN", "커리어 기록 형식이 올바르지 않습니다."),
     INVALID_DISPLAY_NAME(HttpStatus.BAD_REQUEST, "INVALID_DISPLAY_NAME", "이름은 한글·영문·숫자·공백·마침표·밑줄·하이픈·괄호로 1~20자여야 합니다."),
