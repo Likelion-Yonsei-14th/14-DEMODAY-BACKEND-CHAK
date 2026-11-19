@@ -40,6 +40,7 @@ class RecapBroadcastJobTest {
     @Autowired private PushSubscriptionRepository subscriptions;
     @Autowired private PushNotifier notifier;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private com.likelion.chak.repository.UserAccountRepository users;
     @MockitoBean private PushGateway gateway;
     @MockitoBean private AlertNotifier alerts;
 
@@ -58,15 +59,22 @@ class RecapBroadcastJobTest {
             subscriptions.save(new PushSubscription(null, (long) (100 + i),
                     "https://fcm.googleapis.com/fcm/send/" + UUID.randomUUID(), WebPushCrypto.generateVapidKeys().publicKey(), auth));
         }
+        for (String name : new String[]{"운영진", RecapBroadcastJob.STAFF_RECEIVER}) {
+            var admin = com.likelion.chak.domain.UserAccount.createKakao("k-" + UUID.randomUUID(), name, null, null);
+            admin.updateAdmin(true);
+            admin = users.save(admin);
+            subscriptions.save(new PushSubscription(admin.getId(), null,
+                    "https://fcm.googleapis.com/fcm/send/" + UUID.randomUUID(), WebPushCrypto.generateVapidKeys().publicKey(), auth));
+        }
     }
 
     @Test
-    void sendsOnceAtSixAndNeverAgain() {
+    void sendsOnceAtSixSkippingStaffButOneAndNeverAgain() {
         assertThat(at(RecapBroadcastJob.SEND_AT.minusSeconds(60)).run()).isEqualTo(-1);
         verify(gateway, never()).send(anyString(), anyString(), any());
 
-        assertThat(at(RecapBroadcastJob.SEND_AT.plusSeconds(10)).run()).isEqualTo(2);
-        verify(gateway, atLeast(2)).send(anyString(), anyString(), any());
+        assertThat(at(RecapBroadcastJob.SEND_AT.plusSeconds(10)).run()).isEqualTo(3);   // 일반 2 + 조민준 1, 다른 운영진 제외
+        verify(gateway, atLeast(3)).send(anyString(), anyString(), any());
 
         reset(gateway);
         assertThat(at(RecapBroadcastJob.SEND_AT.plusSeconds(40)).run()).isEqualTo(-1);   // 서버가 다시 떠도 두 번 안 감

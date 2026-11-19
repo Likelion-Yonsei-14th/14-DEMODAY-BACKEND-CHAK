@@ -16,7 +16,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * 수능이 끝난 날 저녁 6시, 알림을 켜 둔 모든 브라우저에 "수고 많았어요, 리캡이 열렸어요" 알림을 한 번 보낸다.
+ * 수능이 끝난 날 저녁 6시, 알림을 켜 둔 모든 브라우저(운영진 계정은 조민준만)에 "수고 많았어요, 리캡이 열렸어요" 알림을 한 번 보낸다.
  * 보냈다는 기록을 먼저 남기고 보내서 서버가 다시 떠도 두 번 가지 않는다. 배포가 늦어 2시간이 지나면 보내지 않는다.
  */
 @Component
@@ -25,6 +25,7 @@ public class RecapBroadcastJob {
 
     private static final Logger log = LoggerFactory.getLogger(RecapBroadcastJob.class);
     static final String KEY = "recap-2026";
+    static final String STAFF_RECEIVER = "조민준";
     static final Instant SEND_AT = Instant.parse("2026-11-19T09:00:00Z");          // 2026-11-19 18:00 KST
     static final Instant GIVE_UP_AT = SEND_AT.plusSeconds(2 * 60 * 60);
 
@@ -69,7 +70,12 @@ public class RecapBroadcastJob {
         } catch (DataIntegrityViolationException alreadySent) {
             return -1;
         }
-        List<Long> ids = repository.findAll().stream().map(PushSubscription::getId).toList();
+        // 운영진(관리자 계정)의 구독은 빼고, 운영진 중 조민준만 확인용으로 받는다.
+        List<Long> ids = jdbc.queryForList("""
+                SELECT s.id FROM push_subscriptions s
+                LEFT JOIN users u ON u.id = s.user_id
+                WHERE u.id IS NULL OR u.admin = FALSE OR u.display_name = ?
+                """, Long.class, STAFF_RECEIVER);
         byte[] payload = payload();
         for (Long id : ids) {
             notifier.deliver(id, payload);
