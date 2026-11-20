@@ -135,18 +135,30 @@ class AdDeliveryApiTest {
     }
 
     @Test
-    void showsRegionalAdsOnlyInTheirRegionAndNationwideAdsEverywhere() throws Exception {
+    void keepsOtherRegionsAdsOutWhereARegionalAdMatches() throws Exception {
+        long seoul = createAd("서울 매장", "[\"서울\"]");
         long busan = createAd("부산 매장", "[\"부산\"]");
         long nationwide = createAd("전국", null);
-        for (int i = 0; i < 10; i++) {
-            assertThat(serve("11", null)).isEqualTo(nationwide); // 서울
-            assertThat(serve(null, null)).isEqualTo(nationwide); // 위치 모름
-        }
         Map<Long, Integer> inBusan = new HashMap<>();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 20; i++) {
             inBusan.merge(serve("26", null), 1, Integer::sum);
         }
-        assertThat(inBusan).containsKey(busan);
+        assertThat(inBusan).containsOnlyKeys(busan, nationwide);
+        assertThat(inBusan).doesNotContainKey(seoul);
+    }
+
+    @Test
+    void mixesRegionalAdsInWhenOnlyANationwideAdWouldMatch() throws Exception {
+        long busan = createAd("부산 매장", "[\"부산\"]");
+        long daegu = createAd("대구 매장", "[\"대구\"]");
+        long nationwide = createAd("전국", null);
+        // 서울(지역 광고 없음)과 위치 모름 손님에게 전국 광고 하나만 계속 나가지 않고 고르게 돈다.
+        Map<Long, Integer> served = new HashMap<>();
+        for (int i = 0; i < 15; i++) {
+            served.merge(serve(i % 2 == 0 ? "11" : null, null), 1, Integer::sum);
+        }
+        assertThat(served).containsOnlyKeys(busan, daegu, nationwide);
+        assertThat(served.values()).allSatisfy(count -> assertThat(count).isEqualTo(5));
     }
 
     @Test

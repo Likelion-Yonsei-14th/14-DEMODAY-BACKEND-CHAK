@@ -98,6 +98,26 @@ class DiscountAdApiTest {
     }
 
     @Test
+    void nationwideAdDoesNotAlwaysTopWhenNothingIsNearby() throws Exception {
+        String tag = UUID.randomUUID().toString().substring(0, 6);
+        long nation = create("전국많이" + tag, "전국", true, "");
+        long regional = create("제주덜" + tag, "제주", true, "");
+        for (int i = 0; i < 3; i++) {
+            event(nation, "IMPRESSION", null); // 전국 혜택은 이미 많이 보였다
+        }
+        discountAdService.invalidateCounts();
+
+        // 그 지역(강원) 혜택이 없을 때: 노출이 적은 지역 혜택이 전국 혜택보다 먼저.
+        List<Long> fromGangwon = order(get("/api/public/discounts/sponsored")
+                .header("X-Chak-Geo-Country", "KR").header("X-Chak-Geo-Region", "51"));
+        assertThat(fromGangwon.indexOf(regional)).isLessThan(fromGangwon.indexOf(nation));
+
+        // 내 위치를 알려 줬는데 30km 안에 아무것도 없을 때(울릉도)도 마찬가지.
+        List<Long> farAway = order(get("/api/public/discounts/sponsored").param("lat", "37.48").param("lng", "130.90"));
+        assertThat(farAway.indexOf(regional)).isLessThan(farAway.indexOf(nation));
+    }
+
+    @Test
     void sameViewerSeesLessSeenAdsFirstAndAdsEvenOut() throws Exception {
         String tag = UUID.randomUUID().toString().substring(0, 6);
         long a = create("가" + tag, "제주", true, "");

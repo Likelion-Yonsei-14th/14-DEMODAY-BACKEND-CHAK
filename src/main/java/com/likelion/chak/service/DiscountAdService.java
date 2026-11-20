@@ -33,7 +33,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>
  * 계약은 광고마다 같은 노출이라, 다음 순서로 줄 세운다.
  * <ol>
- *   <li>가까운 매장 먼저: 내 위치를 알려 주면 거리 구간(3·10·30km), 아니면 접속 지역(시·도)이 같은 혜택 → 전국 혜택 → 나머지</li>
+ *   <li>가까운 매장 먼저: 내 위치를 알려 주면 거리 구간(3·10·30km), 아니면 접속 지역(시·도)이 같은 혜택 → 전국 혜택 → 나머지.
+ *       가까운 혜택이 하나도 없으면(접속 지역을 모르거나 그 지역 혜택이 없음) 전국 혜택이 늘 맨 위에 오지 않게 구간을 나누지 않는다</li>
  *   <li>같은 구간 안에서는 이 사람이 오늘 덜 본 혜택 먼저(같은 사람이 같은 광고만 맨 위에서 보지 않게)</li>
  *   <li>지금까지 노출이 적은 혜택 먼저(광고끼리 노출 수가 비슷해지게, 사람마다 맨 위가 달라지게)</li>
  *   <li>그래도 같으면 무작위</li>
@@ -76,15 +77,20 @@ public class DiscountAdService {
         Map<Long, Double> distance = new HashMap<>();
         Map<Long, Integer> tier = new HashMap<>();
         Map<Long, Double> shuffle = new HashMap<>();
+        boolean anyNearby = false;
         for (Discount d : candidates) {
             Double km = located && d.hasLocation() ? distanceKm(lat, lng, d.getLatitude(), d.getLongitude()) : null;
             distance.put(d.getId(), km);
             tier.put(d.getId(), tierOf(km, d.getArea(), regionName, located));
             shuffle.put(d.getId(), ThreadLocalRandom.current().nextDouble());
+            anyNearby |= isNearby(km, d.getArea(), regionName);
         }
+        // 가까운 혜택이 하나도 없으면(접속 지역을 모르거나 그 지역 혜택이 없음) 전국 혜택만 늘 맨 위에 오지 않게
+        // 구간을 나누지 않고 모두 같은 줄에서 덜 본 것·노출 적은 것 순으로 돈다.
+        boolean byDistance = anyNearby;
         List<Discount> sorted = new ArrayList<>(candidates);
         sorted.sort(Comparator
-                .comparingInt((Discount d) -> tier.get(d.getId()))
+                .comparingInt((Discount d) -> byDistance ? tier.get(d.getId()) : 0)
                 .thenComparingLong(d -> seen.getOrDefault(d.getId(), 0L))
                 .thenComparingLong(d -> totals.getOrDefault(d.getId(), 0L)
                         + placedFirstSinceRefresh.getOrDefault(d.getId(), new AtomicLong()).get())
@@ -152,6 +158,11 @@ public class DiscountAdService {
     /** 다음 순서를 정할 때 노출 수를 DB에서 바로 다시 센다(테스트용). */
     public void invalidateCounts() {
         refreshedAt = Instant.EPOCH;
+    }
+
+    /** 이 사람 가까이 있는 혜택인지: 30km 안이거나 접속 지역(시·도)과 같은 지역. */
+    static boolean isNearby(Double km, String area, String regionName) {
+        return km != null ? km <= 30 : regionName != null && regionName.equals(area);
     }
 
     static int tierOf(Double km, String area, String regionName, boolean located) {

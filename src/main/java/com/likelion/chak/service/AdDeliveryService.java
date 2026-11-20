@@ -24,7 +24,8 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * 한 사람에게 보여 줄 광고를 하나 고른다. 계약은 광고마다 같은 노출 수라서 다음 순서로 고른다.
  * <ol>
- *   <li>게재 중이고 기간 안이며, 대상 지역이 맞는 광고만(지역을 모르면 전국 광고만)</li>
+ *   <li>게재 중이고 기간 안이며, 대상 지역이 맞는 광고만. 이 사람 지역을 노린 광고가 하나도 없으면
+ *       (다른 지역이거나 위치를 모름) 전국 광고 하나로 쏠리지 않게 지역 광고도 함께</li>
  *   <li>이 사람이 오늘 덜 본 광고 먼저(같은 사람이 한 광고만 계속 보지 않게)</li>
  *   <li>지금까지 노출이 가장 적은 광고 먼저(모든 광고가 같은 노출 수에 가까워지게)</li>
  *   <li>그래도 같으면 무작위</li>
@@ -53,11 +54,14 @@ public class AdDeliveryService {
             return Optional.empty();
         }
         Instant now = Instant.now();
-        List<Advertisement> candidates = advertisementRepository
-                .findAllByPlacementAndActiveTrueAndStartsAtLessThanEqualAndEndsAtGreaterThanOrderByIdDesc(placement, now, now)
-                .stream()
-                .filter(ad -> ad.targets(regionName))
-                .toList();
+        List<Advertisement> live = advertisementRepository
+                .findAllByPlacementAndActiveTrueAndStartsAtLessThanEqualAndEndsAtGreaterThanOrderByIdDesc(placement, now, now);
+        List<Advertisement> candidates = live.stream().filter(ad -> ad.targets(regionName)).toList();
+        // 이 사람 지역을 노린 광고가 없으면(다른 지역이거나 위치를 모름) 전국 광고만 남아 한 광고로 쏠린다.
+        // 그때는 지역 광고도 함께 후보로 넣어 노출 수를 고르게 맞춘다.
+        if (candidates.stream().allMatch(ad -> ad.targetRegionList().isEmpty())) {
+            candidates = live;
+        }
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
