@@ -38,7 +38,11 @@ public class PublicWriteLimiter {
         REPORT(30, HOUR_MS),
         ORDER(20, HOUR_MS),
         /** 프로필 이름·사진 변경: 회원 한 명이 시간당 20번. */
-        PROFILE_UPDATE(20, HOUR_MS);
+        PROFILE_UPDATE(20, HOUR_MS),
+        /** 롤링페이퍼 반 만들기: 같은 접속자가 시간당 10번. */
+        ROLLING_PAPER_CREATE(10, HOUR_MS),
+        /** 롤링페이퍼 쓰기(참여·한마디·칠판·설정): 같은 접속자가 시간당 200번. 한 반 친구 수십 명에게 쓰고 고쳐도 넉넉하다. */
+        ROLLING_PAPER_WRITE(200, HOUR_MS);
 
         final int limit;
         final long windowMs;
