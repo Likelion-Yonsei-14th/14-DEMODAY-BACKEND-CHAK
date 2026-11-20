@@ -73,6 +73,71 @@ class ChatApiTest {
         verify(liner, never()).search(anyString(), any(), anyInt());
     }
 
+    private static final String NOT_ON_TOPIC = "{\"onTopic\":false,\"searchQuery\":\"\",\"wantsDiscounts\":false,\"keywords\":[]}";
+
+    /** 운영에서 같은 질문이 한 번은 막히고 한 번은 답이 나온 대화. */
+    private static String afterScoreQuestion(String question) {
+        return "{\"messages\":[{\"role\":\"user\",\"content\":\"수능 성적 언제 나와?\"},"
+                + "{\"role\":\"assistant\",\"content\":\"2027학년도 수능 성적은 2026년 12월 11일(금)에 통지될 예정이에요.\"},"
+                + "{\"role\":\"user\",\"content\":\"" + question + "\"}]}";
+    }
+
+    @Test
+    void coreWordQuestionsAreAnsweredEvenWhenTheClassifierSaysOffTopic() throws Exception {
+        when(liner.complete(contains("질문 분류기"), any(), anyInt())).thenReturn(NOT_ON_TOPIC);
+        when(liner.complete(contains("수능 도우미"), any(), anyInt())).thenReturn("착 혜택함에서 골라 봤어요");
+
+        mockMvc.perform(post("/api/public/chat").header("X-Forwarded-For", ip()).contentType(MediaType.APPLICATION_JSON)
+                        .content(afterScoreQuestion("수험표로 받을 수 있는 음식점 할인 알려줘")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.offTopic").value(false))
+                .andExpect(jsonPath("$.answer").value("착 혜택함에서 골라 봤어요"));
+        // 혜택 질문이므로 웹 검색은 하지 않고, 분류기에는 주제 안이라고 미리 알려 준다.
+        verify(liner, never()).search(anyString(), any(), anyInt());
+        verify(liner).complete(argThat(system -> system.contains("질문 분류기") && system.contains("이미 확인됐다")), any(), anyInt());
+    }
+
+    @Test
+    void coreWordQuestionsSurviveAClassifierThatDoesNotReturnJson() throws Exception {
+        when(liner.complete(contains("질문 분류기"), any(), anyInt())).thenReturn("성적은 12월에 나와요!");
+        when(liner.search(anyString(), any(), anyInt())).thenReturn(List.of());
+        when(liner.complete(contains("수능 도우미"), any(), anyInt())).thenReturn("평가원 사이트에서 확인해 주세요");
+
+        mockMvc.perform(post("/api/public/chat").header("X-Forwarded-For", ip()).contentType(MediaType.APPLICATION_JSON)
+                        .content(ask("수능 성적 언제 나와?")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.offTopic").value(false))
+                .andExpect(jsonPath("$.discounts.length()").value(0));
+        verify(liner).search(eq("수능 성적 언제 나와?"), any(), anyInt());
+    }
+
+    @Test
+    void offTopicQuestionsStayBlockedEvenAfterAnOnTopicConversation() throws Exception {
+        when(liner.complete(contains("질문 분류기"), any(), anyInt())).thenReturn(NOT_ON_TOPIC);
+
+        for (String question : List.of("오늘 저녁 메뉴 추천해줘", "수시로 연락하는 친구랑 싸웠어", "내 성적 취향이 궁금해")) {
+            mockMvc.perform(post("/api/public/chat").header("X-Forwarded-For", ip()).contentType(MediaType.APPLICATION_JSON)
+                            .content(afterScoreQuestion(question)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.offTopic").value(true));
+        }
+        verify(liner, never()).search(anyString(), any(), anyInt());
+        verify(liner, never()).complete(contains("수능 도우미"), any(), anyInt());
+    }
+
+    @Test
+    void classifierGetsOnlyTheLastQuestionToJudgeWithHistoryAsReference() throws Exception {
+        when(liner.complete(contains("질문 분류기"), any(), anyInt())).thenReturn(NOT_ON_TOPIC);
+
+        mockMvc.perform(post("/api/public/chat").header("X-Forwarded-For", ip()).contentType(MediaType.APPLICATION_JSON)
+                        .content(afterScoreQuestion("오늘 저녁 메뉴 추천해줘")))
+                .andExpect(status().isOk());
+        verify(liner).complete(argThat(system -> system.contains("질문 분류기") && !system.contains("이미 확인됐다")),
+                argThat(messages -> messages.size() == 1 && "user".equals(messages.get(0).role())
+                        && messages.get(0).content().contains("<이전 대화>\n사용자: 수능 성적 언제 나와?\n도우미: 2027학년도")
+                        && messages.get(0).content().endsWith("<질문>\n오늘 저녁 메뉴 추천해줘\n</질문>")), anyInt());
+    }
+
     @Test
     void answersWithOurDiscountsFirstAndOnlyTrustedSources() throws Exception {
         String tag = "망원" + System.nanoTime();
