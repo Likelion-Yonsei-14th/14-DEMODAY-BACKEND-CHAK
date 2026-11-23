@@ -111,7 +111,7 @@ public class Advertisement {
     /** 이 지역 사람에게 보여 줄 수 있는지. 지역을 모르는 사람에게는 전국 광고만. */
     public boolean targets(String regionName) {
         java.util.List<String> regions = targetRegionList();
-        return regions.isEmpty() || (regionName != null && regions.contains(regionName));
+        return regions.isEmpty() || regions.stream().anyMatch(region -> com.likelion.chak.service.AdRegions.reaches(region, regionName));
     }
 
     public void deactivate() {

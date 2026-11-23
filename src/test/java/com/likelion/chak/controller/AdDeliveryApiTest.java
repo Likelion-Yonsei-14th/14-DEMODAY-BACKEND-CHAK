@@ -148,6 +148,31 @@ class AdDeliveryApiTest {
     }
 
     @Test
+    void showsSeoulAdsToGyeonggiAndIncheonVisitorsButNotTheOtherWay() throws Exception {
+        long seoul = createAd("서울 매장", "[\"서울\"]");
+        long gyeonggi = createAd("경기 매장", "[\"경기\"]");
+        long busan = createAd("부산 매장", "[\"부산\"]");
+        Map<Long, Integer> inGyeonggi = new HashMap<>();
+        Map<Long, Integer> inIncheon = new HashMap<>();
+        Map<Long, Integer> inSeoul = new HashMap<>();
+        // 노출 수를 고르게 맞추므로, 다른 지역 노출이 섞이지 않게 지역마다 따로 돌린다.
+        for (int i = 0; i < 10; i++) {
+            inGyeonggi.merge(serve("41", null), 1, Integer::sum);
+        }
+        for (int i = 0; i < 4; i++) {
+            inIncheon.merge(serve("28", null), 1, Integer::sum);
+            inSeoul.merge(serve("11", null), 1, Integer::sum);
+        }
+        // 외곽(경기·인천)에서도 서울로 오기 쉬워 서울 광고가 함께 돈다.
+        assertThat(inGyeonggi).containsOnlyKeys(seoul, gyeonggi);
+        assertThat(inGyeonggi.values()).allSatisfy(count -> assertThat(count).isEqualTo(5));
+        assertThat(inIncheon).containsOnlyKeys(seoul);
+        // 서울 방문자에게 경기 광고를, 어디에도 부산 광고를 섞지 않는다.
+        assertThat(inSeoul).containsOnlyKeys(seoul);
+        assertThat(inGyeonggi).doesNotContainKey(busan);
+    }
+
+    @Test
     void mixesRegionalAdsInWhenOnlyANationwideAdWouldMatch() throws Exception {
         long busan = createAd("부산 매장", "[\"부산\"]");
         long daegu = createAd("대구 매장", "[\"대구\"]");
