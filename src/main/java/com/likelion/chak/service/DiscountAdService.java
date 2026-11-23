@@ -160,16 +160,16 @@ public class DiscountAdService {
         refreshedAt = Instant.EPOCH;
     }
 
-    /** 이 사람 가까이 있는 혜택인지: 30km 안이거나 접속 지역(시·도)과 같은 지역. */
+    /** 이 사람 가까이 있는 혜택인지: 30km 안이거나 접속 지역(시·도)에 닿는 지역(서울 혜택은 경기·인천에도). */
     static boolean isNearby(Double km, String area, String regionName) {
-        return km != null ? km <= 30 : regionName != null && regionName.equals(area);
+        return km != null ? km <= 30 : AdRegions.reaches(area, regionName);
     }
 
     static int tierOf(Double km, String area, String regionName, boolean located) {
         if (km != null) {
             return km <= 3 ? 0 : km <= 10 ? 1 : km <= 30 ? 2 : 5;
         }
-        if (regionName != null && regionName.equals(area)) {
+        if (AdRegions.reaches(area, regionName)) {
             return located ? 3 : 1;
         }
         if (NATIONWIDE.equals(area)) {
