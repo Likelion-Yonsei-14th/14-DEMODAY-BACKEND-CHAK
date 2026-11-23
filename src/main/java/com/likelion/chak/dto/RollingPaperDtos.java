@@ -1,5 +1,6 @@
 package com.likelion.chak.dto;
 
+import com.likelion.chak.domain.RollingPaperKind;
 import com.likelion.chak.domain.RollingPaperRevealMode;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -11,24 +12,35 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-/** 졸업 롤링페이퍼 요청/응답 모음. */
+/** 연말 롤링페이퍼(반·개인) 요청/응답 모음. */
 public final class RollingPaperDtos {
 
     private RollingPaperDtos() {
     }
 
-    /** 반 만들기: 반 이름·내 이름·내 종이 디자인·공개 방식을 한 번에 정한다. */
+    /**
+     * 만들기: 이름(반 이름 또는 개인 롤링페이퍼 제목)·내 이름·내 종이 디자인·공개 방식을 한 번에 정한다.
+     * {@code kind}를 비우면 반({@code CLASS}).
+     */
     public record CreateRequest(
             @NotBlank @Size(max = 20) String name,
             @NotBlank @Size(max = 12) String displayName,
             @NotBlank @Size(max = 48) String paperDesign,
-            @NotNull RollingPaperRevealMode revealMode) {
+            @NotNull RollingPaperRevealMode revealMode,
+            RollingPaperKind kind) {
+
+        public CreateRequest(String name, String displayName, String paperDesign, RollingPaperRevealMode revealMode) {
+            this(name, displayName, paperDesign, revealMode, null);
+        }
     }
 
-    /** 링크로 들어온 친구가 자기 롤링페이퍼를 건다. */
+    /**
+     * 링크로 들어온 사람. 반이면 자기 롤링페이퍼를 걸고(디자인 필수),
+     * 개인 롤링페이퍼면 쓰는 사람으로만 들어온다(디자인은 비워도 된다).
+     */
     public record JoinRequest(
             @NotBlank @Size(max = 12) String displayName,
-            @NotBlank @Size(max = 48) String paperDesign) {
+            @Size(max = 48) String paperDesign) {
     }
 
     /** 만든 사람만: 반 이름·공개 방식 변경. 비운 값은 그대로 둔다. */
@@ -75,6 +87,7 @@ public final class RollingPaperDtos {
      */
     public record ClassView(
             String code,
+            RollingPaperKind kind,
             String name,
             RollingPaperRevealMode revealMode,
             Instant endedAt,
@@ -85,6 +98,10 @@ public final class RollingPaperDtos {
             MyPaperView myPaper) {
     }
 
+    /**
+     * 종이 위 한마디. 개인 롤링페이퍼에서 주인이 아닌 사람에게는 남이 쓴 글을 {@code hidden=true}로 보내고
+     * 글·이름은 비운다(자리·펜·스탬프만 와서 화면은 그 자리를 흐리게 그린다).
+     */
     public record NoteView(
             Long id,
             Long authorMemberId,
@@ -95,6 +112,7 @@ public final class RollingPaperDtos {
             BigDecimal x,
             BigDecimal y,
             boolean mine,
+            boolean hidden,
             Instant createdAt) {
     }
 
@@ -103,6 +121,6 @@ public final class RollingPaperDtos {
     }
 
     /** 내가 들어간 반 목록(홈에서 이어 가기용). */
-    public record MyClassView(String code, String name, Instant endedAt, boolean creator) {
+    public record MyClassView(String code, RollingPaperKind kind, String name, Instant endedAt, boolean creator) {
     }
 }
