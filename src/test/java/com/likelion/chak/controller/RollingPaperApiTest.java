@@ -126,13 +126,17 @@ class RollingPaperApiTest {
         assertThat(minjiView.get("myPaper").get("open").asBoolean()).isFalse();
         assertThat(minjiView.get("myPaper").get("noteCount").asLong()).isEqualTo(1);
 
-        // 반 친구는 친구 종이를 읽는다.
+        // 반 친구도 친구 종이에 남이 쓴 글은 자리만 받는다(글·이름은 주인만).
         Visitor seoyeon = new Visitor();
         join(seoyeon, code, "서연");
         JsonNode friendView = seoyeon.ok(get(BASE + "/" + code + "/papers/" + minjiId), 200);
         assertThat(friendView.get("sealed").asBoolean()).isFalse();
-        assertThat(friendView.get("notes").get(0).get("authorName").asString()).isEqualTo("현우");
-        assertThat(friendView.get("notes").get(0).get("mine").asBoolean()).isFalse();
+        JsonNode hidden = friendView.get("notes").get(0);
+        assertThat(hidden.get("hidden").asBoolean()).isTrue();
+        assertThat(hidden.get("text").isNull()).isTrue();
+        assertThat(hidden.get("authorName").asString()).isEmpty();
+        assertThat(hidden.get("mine").asBoolean()).isFalse();
+        assertThat(hidden.get("x").decimalValue()).isEqualByComparingTo("70.46");
 
         // 종료는 만든 사람만. 종료하면 자기 종이가 열리고 더는 쓸 수 없다.
         assertThat(hyunwoo.error(post(BASE + "/" + code + "/end"), 403)).isEqualTo("ROLLING_PAPER_CREATOR_ONLY");
