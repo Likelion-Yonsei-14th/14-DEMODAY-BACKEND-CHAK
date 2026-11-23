@@ -328,3 +328,11 @@ UNIQUE `(advertisement_id, event_type, session_id)` — 재시도 중복 방지.
 - `favorite_desks`: `user_id`(담은 회원), `desk_id`(담은 책상), `created_at`. `(user_id, desk_id)` UNIQUE. 책상을 지워도(soft delete) 행은 남지만 목록에서는 빠지고, 탈퇴한 회원의 행은 지운다. 인덱스 `(user_id, created_at)`.
 - `push_subscriptions`: `user_id` 또는 `guest_id`(둘 중 하나), `endpoint`(고유, 알려진 푸시 서비스 주소), `p256dh`·`auth`(받는 브라우저의 암호 키), `created_at`, `last_success_at`, `failure_count`. 인덱스 `user_id`, `guest_id`.
 - 회원 탈퇴 처리 때 그 회원의 구독을 지우고, 180일 동안 알림이 한 번도 전달되지 않은 구독은 정리 배치가 지웁니다.
+
+## 졸업 롤링페이퍼 (V30)
+
+- `rolling_paper_classes`: `code`(초대 링크용 난수 22자·고유), `name`, `reveal_mode`(`INSTANT`: 자기 종이를 바로 봄, `ON_END`: 만든 사람이 종료하면 봄), `ended_at`(종료 시각, 종료하면 더 쓸 수 없음), `created_at`.
+- `rolling_paper_members`: 반의 한 사람이자 그 사람의 롤링페이퍼. `class_id`, `user_id` 또는 `guest_id`(둘 중 하나), `display_name`(사물함 이름표), `paper_design`(프론트 편지지·기본 배경 id), `creator`(반을 만든 사람), `created_at`. `(class_id, user_id)`·`(class_id, guest_id)` UNIQUE라 한 사람은 한 반에 종이 하나다. 인덱스 `user_id`, `guest_id`.
+- `rolling_paper_notes`: `class_id`, `paper_member_id`(종이 주인), `author_member_id`(쓴 사람), `note_text`(60자), `pen`, `stamp`, `pos_x`·`pos_y`(종이에서 글 가운데의 %, `DECIMAL(5,2)`), `created_at`, `updated_at`. `(paper_member_id, author_member_id)` UNIQUE라 한 친구 종이에 한마디 하나이고, 다시 쓰면 고치거나 옮긴다.
+- `rolling_paper_board_entries`: 교실 칠판. `class_id`, `author_member_id`, `entry_text`(30자), `created_at`. 인덱스 `(class_id, created_at)`.
+- 반을 지우면(만든 사람만) 한마디·칠판·종이·반을 차례로 지운다(외래 키에 CASCADE를 쓰지 않음). 회원 탈퇴 처리는 이 표들을 건드리지 않는다(이름표는 반 안에서 쓴 이름이다).

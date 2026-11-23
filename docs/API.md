@@ -64,6 +64,7 @@
 | ProductCode | `CHARM_ACRYLIC`, `GEM`, `UNIVERSITY_CHARM`, `PENNANT`, `LOCKER_BULB`, `LOCKER_PAINT` |
 | UnlockCategory | `STATIONERY`(편지지), `DECOR`(클립·마스킹 테이프) |
 | TrafficEventType (클라이언트 전송 가능) | `PAGE_VIEW`, `MESSAGE_COMPOSE_STARTED` |
+| RollingPaperRevealMode | `INSTANT`(자기 종이를 바로 봄), `ON_END`(만든 사람이 종료하면 봄) |
 
 잘못된 enum 값이나 JSON 파싱 오류는 `400 INVALID_REQUEST`입니다.
 
@@ -1393,6 +1394,14 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 | 400 | `NICKNAME_NOT_ALLOWED` | 금칙어가 들어 있는 닉네임 |
 | 405 | `METHOD_NOT_ALLOWED` | 지원하지 않는 HTTP 메서드 |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | `application/json`이 아닌 Content-Type |
+| 404 | `ROLLING_PAPER_NOT_FOUND` | 없거나 삭제된 롤링페이퍼 반 |
+| 404 | `ROLLING_PAPER_MEMBER_NOT_FOUND` | 이 반에 없는 종이(사물함) |
+| 403 | `ROLLING_PAPER_NOT_MEMBER` | 반에 들어오지 않은 사람의 종이 조회·쓰기 |
+| 409 | `ROLLING_PAPER_ALREADY_JOINED` | 이미 이 반에 내 종이가 있음 |
+| 403 | `ROLLING_PAPER_CREATOR_ONLY` | 반을 만든 사람만 할 수 있는 일(이름·공개 방식·종료·삭제) |
+| 409 | `ROLLING_PAPER_ENDED` | 종료된 반의 종이에 쓰기 |
+| 400 | `ROLLING_PAPER_OWN_PAPER` | 내 종이에 쓰기 |
+| 409 | `ROLLING_PAPER_FULL` | 반 인원(60명)·칠판 글(300줄) 상한 |
 | 500 | `INTERNAL_SERVER_ERROR` | 서버 내부 오류 |
 
 ## 12. 아직 제공하지 않는 API
@@ -1403,3 +1412,84 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 - 이미지 삭제 및 미완료 업로드 정리 배치(비회원 이미지 첨부는 정책상 허용하지 않음)
 - 실제 결제 승인(PG 연동), 결제 환불, 알림 발송
 - 상세 분석 대시보드용 일별 집계 테이블
+
+## 13. 연말 롤링페이퍼 API
+
+반을 만든 사람과 초대 링크로 들어온 친구가 각자 롤링페이퍼(사물함)를 하나씩 걸고, 서로의 종이에 한마디씩 남깁니다. 경로는 모두 `/api/public/rolling-papers` 아래이며 로그인하지 않아도 됩니다(회원이면 회원, 아니면 `chak_guest_id` 쿠키의 비회원). 반은 초대 링크의 `code`로 찾습니다.
+
+롤링페이퍼는 두 종류입니다. 만들 때 `kind`로 고르고, 비우면 `CLASS`입니다. 응답의 `ClassView.kind`, `MyClassView.kind`로 구분합니다.
+
+- `CLASS`(반): 들어온 사람마다 자기 종이를 걸고 서로 씁니다. 칠판이 있습니다.
+- `PERSONAL`(개인): 만든 사람의 종이 한 장만 있습니다. 링크로 온 사람은 `POST /{code}/members`에 `displayName`만 보내 쓰는 사람으로 들어옵니다(`paperDesign` 생략 가능). 목록 `members`에는 주인만 오고, 반에 들어오기 전에도 주인 이름·디자인이 보입니다. 칠판은 없습니다(`INVALID_REQUEST`). 주인이 아닌 사람이 종이를 보면 남이 쓴 한마디는 `hidden: true`이고 `text`·`authorMemberId`가 null, `authorName`이 빈 문자열입니다. 자리(`x`, `y`)·펜·스탬프만 오니, 화면은 그 자리를 흐리게 그립니다. 내가 쓴 글과 주인이 보는 글은 그대로 옵니다.
+
+규칙
+
+- 자기 종이에는 쓸 수 없습니다. 자기 종이는 `revealMode`가 `INSTANT`이거나 반이 종료된 뒤에만 글이 보이고, 그 전에는 개수만 보입니다.
+- 반 친구는 친구 종이의 글을 모두 읽습니다(빈 자리를 고르는 데 씀). 남의 종이에 글이 몇 개인지는 반 화면에 나오지 않고, 내가 썼는지(`writtenByMe`)만 나옵니다.
+- 한 사람은 한 친구 종이에 한마디 하나만 남깁니다. 다시 `PUT`하면 글을 고치거나 자리를 옮깁니다.
+- 반 이름·공개 방식 변경, 종료, 반 삭제는 만든 사람만 합니다. 종료하면 되돌릴 수 없고 더 이상 종이에 쓸 수 없습니다(칠판은 계속 씀).
+- 쓰기 요청은 같은 접속자 기준 반 만들기 시간당 10번, 그 밖의 쓰기 시간당 200번까지입니다(`429 TOO_MANY_EVENTS`).
+- 값: 반 이름 20자, 이름표 12자, 한마디 60자, 칠판 30자. `pen`은 `ink` `red` `blue` `green` `purple` `pink`, `stamp`는 `none` `heart` `star` `flower` `smile` `cap`, `paperDesign`은 프론트 배경 id(`bg-`로 시작하는 소문자·숫자·하이픈). `x`·`y`는 0~100(종이 너비·높이의 %, 소수 둘째 자리까지 저장).
+
+| 메서드 | 경로 | 누가 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/api/public/rolling-papers` | 누구나 | 반 만들기. 만든 사람의 종이가 함께 걸림. `201` + 반 화면 |
+| GET | `/api/public/rolling-papers/mine` | 누구나 | 내가 들어간 반 목록(최근 순) `[{ code, name, endedAt, creator }]` |
+| GET | `/api/public/rolling-papers/{code}` | 누구나 | 반 화면. 반에 없는 사람에게는 `name`·`revealMode`·`endedAt`·`memberCount`만 |
+| PATCH | `/api/public/rolling-papers/{code}` | 만든 사람 | `{ name?, revealMode? }` |
+| DELETE | `/api/public/rolling-papers/{code}` | 만든 사람 | 반 삭제(종이·한마디·칠판 모두) |
+| POST | `/api/public/rolling-papers/{code}/end` | 만든 사람 | 롤링페이퍼 종료 |
+| POST | `/api/public/rolling-papers/{code}/members` | 누구나 | 내 종이 걸기 `{ displayName, paperDesign }`. `201` + 반 화면 |
+| PATCH | `/api/public/rolling-papers/{code}/members/me` | 반 친구 | `{ displayName?, paperDesign? }` |
+| GET | `/api/public/rolling-papers/{code}/papers/{memberId}` | 반 친구 | 종이 한 장 |
+| PUT | `/api/public/rolling-papers/{code}/papers/{memberId}/note` | 반 친구 | 친구 종이에 내 한마디 쓰기·고치기·옮기기 |
+| DELETE | `/api/public/rolling-papers/{code}/papers/{memberId}/note` | 반 친구 | 내 한마디 지우기 |
+| POST | `/api/public/rolling-papers/{code}/board` | 반 친구 | 칠판에 한 줄 `{ text }`. `201` + 반 화면 |
+| DELETE | `/api/public/rolling-papers/{code}/board/{entryId}` | 쓴 사람 | 칠판에서 내 줄 지우기 |
+
+반 만들기 요청
+
+```json
+{ "name": "3학년 2반", "displayName": "민지", "paperDesign": "bg-stationery-note-pink", "revealMode": "ON_END" }
+```
+
+반 화면(반 친구에게)
+
+```json
+{
+  "code": "ZJ_D9zrA4b-diCH3p1nVOg",
+  "name": "3학년 2반",
+  "revealMode": "ON_END",
+  "endedAt": null,
+  "memberCount": 3,
+  "me": { "memberId": 12, "displayName": "현우", "paperDesign": "bg-basic-cream", "creator": false },
+  "members": [
+    { "id": 11, "displayName": "민지", "paperDesign": "bg-stationery-note-pink", "creator": true, "writtenByMe": true },
+    { "id": 12, "displayName": "현우", "paperDesign": "bg-basic-cream", "creator": false, "writtenByMe": false }
+  ],
+  "board": [
+    { "id": 5, "text": "3년 동안 고생했다", "authorName": "민지", "mine": false, "createdAt": "2026-11-20T14:00:00Z" }
+  ],
+  "myPaper": { "open": false, "noteCount": 2 }
+}
+```
+
+한마디 쓰기 요청과 종이 한 장 응답
+
+```json
+{ "text": "졸업 축하해!", "pen": "blue", "stamp": "heart", "x": 30.5, "y": 20 }
+```
+
+```json
+{
+  "member": { "id": 11, "displayName": "민지", "paperDesign": "bg-stationery-note-pink", "creator": true, "writtenByMe": true },
+  "sealed": false,
+  "noteCount": 1,
+  "notes": [
+    { "id": 7, "authorMemberId": 12, "authorName": "현우", "text": "졸업 축하해!", "pen": "blue", "stamp": "heart",
+      "x": 30.50, "y": 20.00, "mine": true, "createdAt": "2026-11-20T14:05:00Z" }
+  ]
+}
+```
+
+아직 열리지 않은 내 종이는 `"sealed": true`, `noteCount`만 있고 `notes`는 빈 배열입니다.
