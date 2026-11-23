@@ -1420,7 +1420,9 @@ GET  /api/chaltteok/history?size=30  [ { "type": "CHARGE|PURCHASE", "amount", "b
 롤링페이퍼는 두 종류입니다. 만들 때 `kind`로 고르고, 비우면 `CLASS`입니다. 응답의 `ClassView.kind`, `MyClassView.kind`로 구분합니다.
 
 - `CLASS`(반): 들어온 사람마다 자기 종이를 걸고 서로 씁니다. 칠판이 있습니다.
-- `PERSONAL`(개인): 만든 사람의 종이 한 장만 있습니다. 링크로 온 사람은 `POST /{code}/members`에 `displayName`만 보내 쓰는 사람으로 들어옵니다(`paperDesign` 생략 가능). 목록 `members`에는 주인만 오고, 반에 들어오기 전에도 주인 이름·디자인이 보입니다. 칠판은 없습니다(`INVALID_REQUEST`). 주인이 아닌 사람이 종이를 보면 남이 쓴 한마디는 `hidden: true`이고 `text`·`authorMemberId`가 null, `authorName`이 빈 문자열입니다. 자리(`x`, `y`)·펜·스탬프만 오니, 화면은 그 자리를 흐리게 그립니다. 내가 쓴 글과 주인이 보는 글은 그대로 옵니다.
+- `PERSONAL`(개인): 만든 사람의 종이 한 장만 있습니다. 링크로 온 사람은 `POST /{code}/members`에 `displayName`만 보내 쓰는 사람으로 들어옵니다(`paperDesign` 생략 가능). 목록 `members`에는 주인만 오고, 반에 들어오기 전에도 주인 이름·디자인이 보입니다. 칠판은 없습니다(`INVALID_REQUEST`).
+
+반·개인 모두, 종이 주인이 아닌 사람이 종이를 보면 남이 쓴 한마디는 `hidden: true`이고 `text`·`authorMemberId`가 null, `authorName`이 빈 문자열입니다. 자리(`x`, `y`)·펜·스탬프만 오니, 화면은 그 자리를 흐리게 그립니다. 내가 쓴 글과 주인이 보는 글은 그대로 옵니다.
 
 규칙
 

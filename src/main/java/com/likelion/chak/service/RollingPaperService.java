@@ -47,10 +47,10 @@ import java.util.stream.Collectors;
  * 서로의 종이에 한마디씩 남긴다.
  * <p>
  * 개인({@code PERSONAL}): 만든 사람의 종이 한 장. 링크로 온 사람은 이름만 정하고 쓰는 사람으로 들어온다.
- * 남이 쓴 글은 주인만 읽고, 다른 사람에게는 자리만 보낸다(화면은 흐리게 그린다). 칠판은 없다.
+ * 칠판은 없다. 반·개인 모두 남이 쓴 글은 주인만 읽고, 다른 사람에게는 자리만 보낸다(화면은 흐리게 그린다).
  * <ul>
  *   <li>자기 종이에는 쓸 수 없다. 자기 종이는 공개 방식이 {@code INSTANT}이거나 반이 종료된 뒤에만 볼 수 있다.</li>
- *   <li>친구 종이는 반 친구 누구나 읽는다(빈 자리를 고르는 데 쓴다).</li>
+ *   <li>친구 종이는 반 친구 누구나 열지만, 남이 쓴 글은 자리만 받는다(글·이름은 종이 주인만 읽는다).</li>
  *   <li>종료되면 더 이상 종이에 쓸 수 없다. 종료·반 이름·공개 방식·삭제는 만든 사람만 한다.</li>
  * </ul>
  */
@@ -283,8 +283,8 @@ public class RollingPaperService {
         Map<Long, RollingPaperMember> authors = memberRepository
                 .findAllByPaperClassIdOrderByIdAsc(paperClass.getId()).stream()
                 .collect(Collectors.toMap(RollingPaperMember::getId, Function.identity()));
-        // 개인 롤링페이퍼: 주인이 아니면 남이 쓴 글은 자리만 보낸다(누가 뭐라고 썼는지는 주인만).
-        boolean hideOthers = paperClass.isPersonal() && !mine;
+        // 주인이 아니면 남이 쓴 글은 자리만 보낸다(누가 뭐라고 썼는지는 주인만). 반·개인 모두 같다.
+        boolean hideOthers = !mine;
         List<NoteView> noteViews = notes.stream()
                 .map(n -> {
                     Long authorId = n.getAuthor().getId();
