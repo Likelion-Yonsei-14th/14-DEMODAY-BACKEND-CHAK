@@ -147,6 +147,59 @@ class RollingPaperApiTest {
     }
 
     @Test
+    void personalPaperHidesOtherWritersNotesFromEveryoneButTheOwner() throws Exception {
+        Visitor minji = new Visitor();
+        JsonNode created = minji.ok(json(post(BASE), "{\"name\":\"민지에게 한마디\",\"displayName\":\"민지\","
+                + "\"paperDesign\":\"bg-stationery-note-pink\",\"revealMode\":\"INSTANT\",\"kind\":\"PERSONAL\"}"), 201);
+        String code = created.get("code").asString();
+        long minjiId = created.get("me").get("memberId").asLong();
+        assertThat(created.get("kind").asString()).isEqualTo("PERSONAL");
+
+        // 링크로 처음 온 사람에게는 누구의 종이인지(주인 이름·디자인)가 보인다.
+        Visitor hyunwoo = new Visitor();
+        JsonNode preview = hyunwoo.ok(get(BASE + "/" + code), 200);
+        assertThat(preview.get("members")).hasSize(1);
+        assertThat(preview.get("members").get(0).get("displayName").asString()).isEqualTo("민지");
+        assertThat(preview.get("members").get(0).get("paperDesign").asString()).isEqualTo("bg-stationery-note-pink");
+
+        // 쓰러 온 사람은 이름만 정하고(디자인 없이) 들어온다. 종이 목록에는 주인 것만 있다.
+        JsonNode joined = hyunwoo.ok(json(post(BASE + "/" + code + "/members"), "{\"displayName\":\"현우\"}"), 201);
+        long hyunwooId = joined.get("me").get("memberId").asLong();
+        assertThat(joined.get("members")).hasSize(1);
+        hyunwoo.ok(json(put(BASE + "/" + code + "/papers/" + minjiId + "/note"), note("올해 고마웠어", 30, 20)), 200);
+        // 쓰러 온 사람에게는 종이가 없고, 칠판도 없다.
+        assertThat(hyunwoo.error(get(BASE + "/" + code + "/papers/" + hyunwooId), 404)).isEqualTo("ROLLING_PAPER_MEMBER_NOT_FOUND");
+        assertThat(minji.error(json(put(BASE + "/" + code + "/papers/" + hyunwooId + "/note"), note("나도", 50, 50)), 404))
+                .isEqualTo("ROLLING_PAPER_MEMBER_NOT_FOUND");
+        assertThat(hyunwoo.error(json(post(BASE + "/" + code + "/board"), "{\"text\":\"안녕\"}"), 400)).isEqualTo("INVALID_REQUEST");
+
+        // 다음 사람은 현우 글의 자리만 받고, 글·이름은 받지 않는다(화면은 흐리게). 자기 글은 그대로 본다.
+        Visitor seoyeon = new Visitor();
+        seoyeon.ok(json(post(BASE + "/" + code + "/members"), "{\"displayName\":\"서연\"}"), 201);
+        JsonNode written = seoyeon.ok(json(put(BASE + "/" + code + "/papers/" + minjiId + "/note"), note("메리 크리스마스", 60, 70)), 200);
+        assertThat(written.get("notes")).hasSize(2);
+        JsonNode others = written.get("notes").get(0);
+        assertThat(others.get("hidden").asBoolean()).isTrue();
+        assertThat(others.get("text").isNull()).isTrue();
+        assertThat(others.get("authorName").asString()).isEmpty();
+        assertThat(others.get("authorMemberId").isNull()).isTrue();
+        assertThat(others.get("x").decimalValue()).isEqualByComparingTo("30");
+        JsonNode own = written.get("notes").get(1);
+        assertThat(own.get("hidden").asBoolean()).isFalse();
+        assertThat(own.get("text").asString()).isEqualTo("메리 크리스마스");
+
+        // 주인은 모두 읽는다.
+        JsonNode ownerView = minji.ok(get(BASE + "/" + code + "/papers/" + minjiId), 200);
+        assertThat(ownerView.get("notes")).hasSize(2);
+        assertThat(ownerView.get("notes").get(0).get("text").asString()).isEqualTo("올해 고마웠어");
+        assertThat(ownerView.get("notes").get(0).get("authorName").asString()).isEqualTo("현우");
+        assertThat(ownerView.get("notes").get(0).get("hidden").asBoolean()).isFalse();
+
+        JsonNode mine = hyunwoo.ok(get(BASE + "/mine"), 200);
+        assertThat(mine.get(0).get("kind").asString()).isEqualTo("PERSONAL");
+    }
+
+    @Test
     void instantRevealShowsTheOwnersPaperRightAway() throws Exception {
         Visitor minji = new Visitor();
         JsonNode created = createClass(minji, "INSTANT");

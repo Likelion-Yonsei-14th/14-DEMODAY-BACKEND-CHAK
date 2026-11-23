@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 
-/** 졸업 롤링페이퍼 반. 초대 링크는 추측하기 어려운 {@code code}로 연다. */
+/** 연말 롤링페이퍼(반 또는 개인). 초대 링크는 추측하기 어려운 {@code code}로 연다. */
 @Getter
 @Entity
 @Table(name = "rolling_paper_classes")
@@ -33,22 +33,35 @@ public class RollingPaperClass {
     @Column(nullable = false, length = 20)
     private RollingPaperRevealMode revealMode;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20, updatable = false)
+    private RollingPaperKind kind;
+
     private Instant endedAt;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
-    private RollingPaperClass(String code, String name, RollingPaperRevealMode revealMode) {
+    private RollingPaperClass(String code, String name, RollingPaperRevealMode revealMode, RollingPaperKind kind) {
         this.code = code;
         this.name = name;
         this.revealMode = revealMode;
+        this.kind = kind;
     }
 
     public static RollingPaperClass create(String name, RollingPaperRevealMode revealMode) {
+        return create(name, revealMode, RollingPaperKind.CLASS);
+    }
+
+    public static RollingPaperClass create(String name, RollingPaperRevealMode revealMode, RollingPaperKind kind) {
         byte[] bytes = new byte[16];
         RANDOM.nextBytes(bytes);
         String code = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        return new RollingPaperClass(code, name, revealMode);
+        return new RollingPaperClass(code, name, revealMode, kind == null ? RollingPaperKind.CLASS : kind);
+    }
+
+    public boolean isPersonal() {
+        return kind == RollingPaperKind.PERSONAL;
     }
 
     public boolean isEnded() {
