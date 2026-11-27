@@ -1,5 +1,6 @@
 package com.likelion.chak.service;
 
+import com.likelion.chak.domain.AdEventType;
 import com.likelion.chak.domain.AdPlacement;
 import com.likelion.chak.domain.Advertisement;
 import com.likelion.chak.domain.AdvertisementEvent;
@@ -31,6 +32,13 @@ import java.util.Map;
 public class AdvertisementService {
 
     private static final long MAX_EVENTS_PER_MINUTE = 120;
+    /**
+     * 한 사람(회원·손님)이 한 광고에 하루 남길 수 있는 종류별 기록 수. sessionId는 브라우저가 정하는 값이라
+     * 그것만으로 중복을 거르면 한 사람이 노출·클릭을 끝없이 부풀릴 수 있다. 실제 사용자는 이 값에 닿지 않는다.
+     */
+    static final long MAX_IMPRESSIONS_PER_VIEWER_PER_DAY = 30;
+    static final long MAX_CLICKS_PER_VIEWER_PER_DAY = 10;
+    static final long MAX_VIEWS_PER_VIEWER_PER_DAY = 30;
 
     private final AdvertisementRepository advertisementRepository;
     private final AdvertisementEventRepository advertisementEventRepository;
@@ -149,6 +157,8 @@ public class AdvertisementService {
         }
 
         enforceRateLimit(user, guest);
+        enforceViewerDailyCap(advertisementId, request.eventType(), user, guest);
+        requirePrecedingEvent(advertisementId, request.eventType(), sessionId, user, guest);
         advertisementEventRepository.insertOrKeepExisting(
                 advertisementId,
                 user == null ? null : user.getId(),
@@ -162,6 +172,48 @@ public class AdvertisementService {
                         advertisementId, request.eventType(), sessionId)
                 .orElseThrow(() -> new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
         return new EventRecordedResponse(saved.getId());
+    }
+
+    /** 한 사람이 한 광고에 남기는 종류별 하루 기록 수를 제한한다(노출·클릭 부풀리기 방지). */
+    private void enforceViewerDailyCap(Long advertisementId, AdEventType type, UserAccount user, GuestIdentity guest) {
+        long cap = switch (type) {
+            case IMPRESSION -> MAX_IMPRESSIONS_PER_VIEWER_PER_DAY;
+            case CLICK -> MAX_CLICKS_PER_VIEWER_PER_DAY;
+            case VIEW_STARTED, VIEW_COMPLETED -> MAX_VIEWS_PER_VIEWER_PER_DAY;
+        };
+        Instant since = Instant.now().minus(Duration.ofDays(1));
+        long count = user != null
+                ? advertisementEventRepository.countByAdvertisementIdAndEventTypeAndUserIdAndCreatedAtGreaterThanEqual(
+                        advertisementId, type, user.getId(), since)
+                : advertisementEventRepository.countByAdvertisementIdAndEventTypeAndGuestIdAndCreatedAtGreaterThanEqual(
+                        advertisementId, type, guest.getId(), since);
+        if (count >= cap) {
+            throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
+        }
+    }
+
+    /**
+     * 클릭은 같은 회차(sessionId)의 노출 뒤에만, 시청 완료는 같은 회차의 시청 시작 뒤에만 받는다(같은 사람이 남긴 것이어야 한다).
+     * 화면에 뜬 적 없는 광고에 클릭·완료만 쏟아붓는 것을 막는다.
+     */
+    private void requirePrecedingEvent(
+            Long advertisementId, AdEventType type, String sessionId, UserAccount user, GuestIdentity guest) {
+        AdEventType required = switch (type) {
+            case CLICK -> AdEventType.IMPRESSION;
+            case VIEW_COMPLETED -> AdEventType.VIEW_STARTED;
+            default -> null;
+        };
+        if (required == null) {
+            return;
+        }
+        boolean present = user != null
+                ? advertisementEventRepository.existsByAdvertisementIdAndEventTypeAndSessionIdAndUserId(
+                        advertisementId, required, sessionId, user.getId())
+                : advertisementEventRepository.existsByAdvertisementIdAndEventTypeAndSessionIdAndGuestId(
+                        advertisementId, required, sessionId, guest.getId());
+        if (!present) {
+            throw new CustomException(ErrorCode.INVALID_ANALYTICS_EVENT);
+        }
     }
 
     private Advertisement find(Long advertisementId) {

@@ -85,7 +85,8 @@ public class PublicPollController {
             @Valid @RequestBody VoteRequest request,
             HttpServletRequest http) {
         String ip = ClientIp.of(http);
-        if (!rateLimiter.tryAcquire(Action.POLL_VOTE, "ip" + ip)) {
+        if (!rateLimiter.tryAcquire(Action.POLL_VOTE, "ip" + ip)
+                || (principal == null && !rateLimiter.tryAcquire(Action.POLL_VOTE_PER_POLL, "ip" + ip + ":poll" + pollId))) {
             throw new CustomException(ErrorCode.TOO_MANY_VOTES);
         }
         GuestSession guest = null;

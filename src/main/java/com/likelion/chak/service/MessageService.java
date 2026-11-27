@@ -2,6 +2,7 @@ package com.likelion.chak.service;
 
 import com.likelion.chak.domain.ClaimStatus;
 import com.likelion.chak.domain.DeskObject;
+import com.likelion.chak.domain.DeskObjectType;
 import com.likelion.chak.domain.GuestIdentity;
 import com.likelion.chak.domain.Message;
 import com.likelion.chak.domain.MessageKind;
@@ -34,6 +35,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.List;
 import java.util.function.BiFunction;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,6 +48,16 @@ public class MessageService {
     private static final int MAX_GUEST_CARD_PAYLOAD_LENGTH = 100_000;
     private static final int MAX_STICKERS_PER_PAGE = 10;
     private static final int MAX_PHOTOS_PER_PAGE = 10;
+    /** 오브젝트 metadata는 자리·순서·부적 재료·보석 정도만 담는다. 넉넉하게 잡아도 이 길이를 넘지 않는다. */
+    static final int MAX_OBJECT_METADATA_LENGTH = 8_000;
+    private static final int MAX_ASSET_ID_LENGTH = 100;
+    /** 카드 사진은 작성 화면이 만든 인라인 래스터 이미지(data URL)만 받는다. 외부 주소는 보는 사람 브라우저가 불러 추적에 쓰인다. */
+    private static final Pattern INLINE_PHOTO_SRC =
+            Pattern.compile("^data:image/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\\s]+$");
+    /** 오브젝트 색은 #RGB·#RRGGBB(알파 포함) 16진만 받는다. CSS 값(url(...) 등)이 섞이지 않게 한다. */
+    private static final Pattern HEX_COLOR = Pattern.compile("^#[0-9A-Fa-f]{3,8}$");
+    /** 대학 아크릴 키링 부적 에셋(uni-<학교>-<모양>). 화면이 재료와 상관없이 유료 키링으로 그린다. */
+    private static final String UNIVERSITY_CHARM_PREFIX = "uni-";
     private static final Instant MAX_UNLOCK_BOUND = Instant.parse("9999-01-01T00:00:00Z");
 
     private final DeskService deskService;
@@ -130,7 +142,7 @@ public class MessageService {
                 message,
                 objectRequest.getRepresentationType(),
                 objectRequest.getAssetId(),
-                objectRequest.getColor(),
+                safeColor(objectRequest.getColor()),
                 objectRequest.getX(),
                 objectRequest.getY(),
                 objectRequest.getRotation(),
@@ -297,7 +309,10 @@ public class MessageService {
         }
 
         validateCard(request.getKind(), request.getCard());
-        if (guest && request.getCard() != null && request.getCard().toString().length() > MAX_GUEST_CARD_PAYLOAD_LENGTH) {
+        // 스티커 편지는 카드가 비어 있어야 하지만, 회원·비회원 모두 크기 검사는 빠짐없이 한다.
+        int cardLimit = guest || request.getKind() == MessageKind.STICKER
+                ? MAX_GUEST_CARD_PAYLOAD_LENGTH : MAX_CARD_PAYLOAD_LENGTH;
+        if (request.getCard() != null && request.getCard().toString().length() > cardLimit) {
             throw new CustomException(ErrorCode.INVALID_CARD_PAYLOAD);
         }
         validateDeskObject(request.getObject());
@@ -327,7 +342,28 @@ public class MessageService {
             }
             validateElementArray(page.get("stickerElements"), MAX_STICKERS_PER_PAGE);
             validateElementArray(page.get("photoElements"), MAX_PHOTOS_PER_PAGE);
+            validatePhotoSources(page.get("photoElements"));
         }
+    }
+
+    private void validatePhotoSources(JsonNode photos) {
+        if (photos == null || !photos.isArray()) {
+            return;
+        }
+        for (JsonNode photo : photos) {
+            JsonNode src = photo == null ? null : photo.get("src");
+            if (src == null || !src.isString() || !INLINE_PHOTO_SRC.matcher(src.asString()).matches()) {
+                throw new CustomException(ErrorCode.INVALID_CARD_PAYLOAD);
+            }
+        }
+    }
+
+    private static String safeColor(String color) {
+        if (color == null) {
+            return null;
+        }
+        String trimmed = color.trim();
+        return HEX_COLOR.matcher(trimmed).matches() ? trimmed : null;
     }
 
     /** 비회원은 사진을 첨부할 수 없다. 카드 어느 페이지에든 사진 요소가 있으면 거부한다. */
@@ -359,11 +395,20 @@ public class MessageService {
     /** 오브젝트 metadata에 담긴 유료 요소(아크릴 부적, 보석 스티커)를 서버가 직접 계산해 결제 여부를 검증한다. */
     private Map<ProductCode, Integer> requiredPurchases(GuestMessageCreateRequest request) {
         Map<ProductCode, Integer> required = new EnumMap<>(ProductCode.class);
-        JsonNode metadata = request.getObject() == null ? null : request.getObject().getMetadata();
+        DeskObjectRequest object = request.getObject();
+        // 화면은 uni-로 시작하는 부적을 metadata와 상관없이 대학 아크릴 키링으로 그린다. 그리는 규칙과 같은 기준으로 값을 매긴다.
+        boolean universityCharm = object != null
+                && object.getRepresentationType() == DeskObjectType.CHARM
+                && object.getAssetId() != null
+                && object.getAssetId().trim().startsWith(UNIVERSITY_CHARM_PREFIX);
+        if (universityCharm) {
+            required.put(ProductCode.UNIVERSITY_CHARM, 1);
+        }
+        JsonNode metadata = object == null ? null : object.getMetadata();
         if (metadata == null || !metadata.isObject()) {
             return required;
         }
-        if ("acrylic".equals(metadata.path("material").asString(""))) {
+        if (!universityCharm && "acrylic".equals(metadata.path("material").asString(""))) {
             required.put(ProductCode.CHARM_ACRYLIC, 1);
         }
         JsonNode gems = metadata.get("gems");
@@ -386,6 +431,14 @@ public class MessageService {
         if (object.getX() < 0 || object.getX() > 100
                 || object.getY() < 0 || object.getY() > 100
                 || object.getScale() <= 0 || object.getScale() > 3) {
+            throw new CustomException(ErrorCode.INVALID_DESK_OBJECT);
+        }
+        if (object.getAssetId() != null && object.getAssetId().length() > MAX_ASSET_ID_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_DESK_OBJECT);
+        }
+        if (object.getMetadata() != null && !object.getMetadata().isNull()
+                && (!object.getMetadata().isObject()
+                        || object.getMetadata().toString().length() > MAX_OBJECT_METADATA_LENGTH)) {
             throw new CustomException(ErrorCode.INVALID_DESK_OBJECT);
         }
     }

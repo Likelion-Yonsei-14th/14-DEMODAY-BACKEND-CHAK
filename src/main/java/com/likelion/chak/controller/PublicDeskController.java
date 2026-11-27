@@ -63,13 +63,16 @@ public class PublicDeskController {
     public ResponseEntity<PublicDeskResponse> getDesk(
             @PathVariable("supporterToken") String supporterToken,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
-            @CookieValue(name = "${chak.guest-cookie.name}", required = false) String guestKey) {
+            @CookieValue(name = "${chak.guest-cookie.name}", required = false) String guestKey,
+            HttpServletRequest http) {
         PublicDeskResponse response = deskService.getPublicDesk(supporterToken);
         UserAccount user = authenticatedUser == null
                 ? null
                 : authService.getUser(authenticatedUser.userId());
-        GuestSession guestSession = user == null ? guestIdentityService.resolveOrCreate(guestKey) : null;
-        analyticsService.recordSystem(
+        // 읽기 요청이라 손님 생성 속도를 넘으면 손님도 방문 기록도 만들지 않고 책상만 보여 준다.
+        GuestSession guestSession = user == null
+                ? guestIdentityService.resolveOrCreateIfAllowed(guestKey, ClientIp.of(http)) : null;
+        if (user != null || guestSession != null) analyticsService.recordSystem(
                 user,
                 guestSession == null ? null : guestSession.getGuestIdentity(),
                 TrafficEventType.INVITE_LINK_OPEN,

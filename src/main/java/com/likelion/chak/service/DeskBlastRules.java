@@ -32,13 +32,65 @@ final class DeskBlastRules {
     /**
      * 놓은 횟수·줄 수·최고 콤보가 주어졌을 때 낼 수 있는 가장 높은 점수.
      * 칸 점수(놓을 때마다 최대 9) + 줄 점수 + 책상 비우기 보너스의 상한을 더한다.
-     * 줄 점수는 줄 수² × 콤보이고, 한 번에 6줄 이하라서 줄 수² ≤ 6 × 줄 수이므로 전체는 10 × 6 × 최고 콤보 × 줄 수 이하다.
+     *
+     * <p>줄 점수는 줄을 지운 i번째 순간마다 {@code 10 × k_i² × c_i}다(k_i ≤ 6줄, 콤보 c_i는 지울 때마다 1씩 올라
+     * c_i ≤ min(i, 최고 콤보)). 지운 순간의 수 n은 줄 수와 놓은 횟수를 넘지 않는다. 볼록 함수라서 같은 n이면 큰 k를
+     * 높은 콤보에 몰아줄 때 가장 크므로, n마다 그 값을 구해 가장 큰 것을 쓴다. 예전 상한(10 × 6 × 콤보 × 줄 수)은
+     * 실제로 낼 수 없는 점수까지 받아 랭킹 조작에 쓰였다.
      */
     static long maxScore(int placements, int lines, int bestCombo) {
         long cells = (long) MAX_CELLS_PER_PLACEMENT * placements;
-        long clears = (long) LINE_BASE * MAX_LINES_PER_PLACEMENT * bestCombo * lines;
-        long allClears = (long) ALL_CLEAR_BONUS * lines;
-        return cells + clears + allClears;
+        long maxEvents = Math.min(lines, placements);
+        long allClears = (long) ALL_CLEAR_BONUS * maxEvents;
+        return cells + maxClearPoints(lines, bestCombo, maxEvents) + allClears;
+    }
+
+    /** 위 설명의 줄 점수 상한. */
+    static long maxClearPoints(int lines, int bestCombo, long maxEvents) {
+        if (lines <= 0 || bestCombo <= 0 || maxEvents <= 0) {
+            return 0;
+        }
+        long best = 0;
+        long minEvents = (lines + MAX_LINES_PER_PLACEMENT - 1) / MAX_LINES_PER_PLACEMENT;
+        // 최고 콤보 B에 닿으려면 적어도 B번은 지워야 한다.
+        for (long n = Math.max(minEvents, bestCombo); n <= maxEvents; n++) {
+            best = Math.max(best, clearPointsFor(n, lines, bestCombo));
+        }
+        return (long) LINE_BASE * best;
+    }
+
+    /** n번 지워 줄 lines개를 없앨 때 Σ k² × min(i, B)의 최댓값(1 ≤ k ≤ 6, 큰 k를 뒤쪽 높은 콤보에). */
+    private static long clearPointsFor(long n, long lines, long bestCombo) {
+        long extra = lines - n;                         // 모든 순간에 1줄씩 준 뒤 남는 줄
+        long sixes = Math.min(n, extra / (MAX_LINES_PER_PLACEMENT - 1));
+        long rest = extra - sixes * (MAX_LINES_PER_PLACEMENT - 1);
+        long middle = rest > 0 && sixes < n ? 1 : 0;   // 남은 줄을 한 순간에 몰아준다
+        long ones = n - sixes - middle;
+        // 순간 1..ones는 k=1, 다음 하나는 k=1+rest, 마지막 sixes개는 k=6.
+        long total = comboSum(1, ones, bestCombo);
+        if (middle == 1) {
+            long k = 1 + rest;
+            total += k * k * Math.min(ones + 1, bestCombo);
+        }
+        total += (long) MAX_LINES_PER_PLACEMENT * MAX_LINES_PER_PLACEMENT * comboSum(n - sixes + 1, n, bestCombo);
+        return total;
+    }
+
+    /** Σ_{i=from..to} min(i, B). */
+    private static long comboSum(long from, long to, long bestCombo) {
+        if (to < from) {
+            return 0;
+        }
+        long total = 0;
+        long rampEnd = Math.min(to, bestCombo);
+        if (from <= rampEnd) {
+            total += (from + rampEnd) * (rampEnd - from + 1) / 2;
+        }
+        long flatFrom = Math.max(from, bestCombo + 1);
+        if (flatFrom <= to) {
+            total += bestCombo * (to - flatFrom + 1);
+        }
+        return total;
     }
 
     /** 놓을 때마다 적어도 한 칸 점수는 받는다. */

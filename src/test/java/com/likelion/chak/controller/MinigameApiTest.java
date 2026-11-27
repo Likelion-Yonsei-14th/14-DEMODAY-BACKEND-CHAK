@@ -280,4 +280,17 @@ class MinigameApiTest {
                     .andExpect(status().isBadRequest());
         }
     }
+
+    @Test
+    void aMemberCannotBruteForceTheRankingWithAnonymouslyCreatedRounds() throws Exception {
+        String member = auth(member("찍신 반복"));
+        int accepted = 0;
+        for (int i = 0; i < 61; i++) {
+            String round = newRound(null);   // 비회원으로, 매번 다른 주소에서 판을 만든다
+            int code = mockMvc.perform(submit(round, answersWithScore(round, 3), member)).andReturn().getResponse().getStatus();
+            if (code == 200) accepted++;
+            else assertThat(code).isEqualTo(429);
+        }
+        assertThat(accepted).isEqualTo(60);
+    }
 }

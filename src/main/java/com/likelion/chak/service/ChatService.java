@@ -12,7 +12,6 @@ import com.likelion.chak.liner.LinerApi.SearchResult;
 import com.likelion.chak.liner.LinerApi.Turn;
 import com.likelion.chak.repository.DiscountRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -22,6 +21,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.Semaphore;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -60,6 +60,10 @@ public class ChatService {
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    /** 동시에 외부 모델을 기다리는 질문 수 상한. 넘으면 바로 "잠시 쉬는 중"으로 돌려보낸다. */
+    static final int MAX_CONCURRENT_ANSWERS = 8;
+
+    private final Semaphore inFlight = new Semaphore(MAX_CONCURRENT_ANSWERS);
     private final LinerApi liner;
     private final DiscountRepository discounts;
     private final Clock clock;
@@ -78,9 +82,22 @@ public class ChatService {
     record Plan(boolean onTopic, String searchQuery, boolean wantsDiscounts, List<String> keywords) {
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * 트랜잭션을 걸지 않는다. 걸면 DB 연결 하나를 잡은 채로 느린 외부 호출(분류·검색·답변, 각 최대 40초)을 기다려
+     * 동시 질문 몇 개만으로 연결 풀(운영 10개)이 바닥나 다른 API까지 멈춘다. 혜택 목록은 저장소 호출이 짧게 따로 읽는다.
+     * 동시에 처리하는 질문 수도 {@link #MAX_CONCURRENT_ANSWERS}개로 묶는다.
+     */
     public ChatResponse answer(List<ChatTurn> turns) {
         if (!liner.enabled()) throw new CustomException(ErrorCode.CHAT_NOT_AVAILABLE);
+        if (!inFlight.tryAcquire()) throw new CustomException(ErrorCode.CHAT_NOT_AVAILABLE);
+        try {
+            return answerNow(turns);
+        } finally {
+            inFlight.release();
+        }
+    }
+
+    private ChatResponse answerNow(List<ChatTurn> turns) {
         ChatTurn last = turns.get(turns.size() - 1);
         if (!"user".equals(last.role()) || last.content().strip().length() > MAX_QUESTION) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);

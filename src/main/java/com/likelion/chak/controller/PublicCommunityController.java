@@ -88,8 +88,13 @@ public class PublicCommunityController {
             @AuthenticationPrincipal AuthenticatedUser principal,
             @CookieValue(name = "${chak.guest-cookie.name}", required = false) String guestKey,
             @PathVariable("messageId") Long messageId,
-            @Valid @RequestBody ReactionRequest request) {
-        Writer writer = writer(principal, guestKey);
+            @Valid @RequestBody ReactionRequest request,
+            HttpServletRequest http) {
+        String who = principal != null ? "u" + principal.userId() : "ip" + ClientIp.of(http);
+        if (!writeLimiter.tryAcquire(PublicWriteLimiter.Action.REACTION, who)) {
+            throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
+        }
+        Writer writer = writer(principal, guestKey, http);
         ReactionResponse response = communityService.react(writer.identity, messageId, request.type());
         ResponseEntity.BodyBuilder builder = ResponseEntity.ok();
         GuestCookieService.addHeader(builder, writer.cookie);
@@ -116,7 +121,7 @@ public class PublicCommunityController {
         if (!writeLimiter.tryAcquire(PublicWriteLimiter.Action.REPORT, who)) {
             throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
         }
-        Writer writer = writer(principal, guestKey);
+        Writer writer = writer(principal, guestKey, http);
         communityService.report(writer.identity, messageId, request == null ? null : request.reason());
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.CREATED);
         GuestCookieService.addHeader(builder, writer.cookie);
@@ -130,12 +135,15 @@ public class PublicCommunityController {
         return ResponseEntity.ok(replyService.listForAuthor(identityService.resolve(principal, guestKey)));
     }
 
-    /** 쓰기 요청: 비회원 쿠키가 없으면 새로 만들어 함께 내려준다. */
-    private Writer writer(AuthenticatedUser principal, String guestKey) {
+    /**
+     * 쓰기 요청: 비회원 쿠키가 없으면 새로 만들어 함께 내려준다. 새 손님은 접속자별 생성 속도 안에서만 만든다
+     * (요청이 뒤에서 실패해도 손님 행은 이미 저장되므로, 쿠키 없는 요청을 반복해 행을 무한정 늘리지 못하게).
+     */
+    private Writer writer(AuthenticatedUser principal, String guestKey, HttpServletRequest http) {
         if (principal != null) {
             return new Writer(identityService.resolve(principal, null), null);
         }
-        GuestSession session = guestCookieService.resolveOrCreate(guestKey);
+        GuestSession session = guestCookieService.resolveOrCreateLimited(guestKey, ClientIp.of(http));
         return new Writer(new CallerIdentity(null, session.getGuestIdentity()),
                 guestCookieService.cookieHeaderIfCreated(session));
     }

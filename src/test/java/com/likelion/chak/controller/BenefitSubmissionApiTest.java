@@ -50,6 +50,7 @@ class BenefitSubmissionApiTest {
     @MockitoBean private AlertNotifier notifier;
     @MockitoBean private S3Client s3Client;
     @MockitoBean private S3Presigner s3Presigner;
+    @Autowired private com.likelion.chak.service.BenefitSubmissionService benefitService;
 
     private void stubPresigner() throws Exception {
         PresignedPutObjectRequest put = mock(PresignedPutObjectRequest.class);
@@ -195,10 +196,28 @@ class BenefitSubmissionApiTest {
         mockMvc.perform(get("/api/admin/benefit-submissions/" + id).header("Authorization", auth))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.answers.percent").value(20))
                 .andExpect(jsonPath("$.files[0].field").value("logoFileKey"));
+        // 누구나 올린 파일은 운영자 브라우저에서 내려받기로만 열린다(F17).
+        var captor = org.mockito.ArgumentCaptor.forClass(GetObjectPresignRequest.class);
+        org.mockito.Mockito.verify(s3Presigner, org.mockito.Mockito.atLeastOnce()).presignGetObject(captor.capture());
+        assertThat(captor.getValue().getObjectRequest().responseContentDisposition()).startsWith("attachment;");
         mockMvc.perform(patch("/api/admin/benefit-submissions/" + id).header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"CONTACTED\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONTACTED"));
         mockMvc.perform(get("/api/admin/benefit-submissions/99999999").header("Authorization", auth))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void nonRasterUploadsAreServedAsOpaqueDownloadsSoSvgScriptCannotRun() throws Exception {
+        stubPresigner();
+        var service = org.springframework.test.util.AopTestUtils.<com.likelion.chak.service.BenefitSubmissionService>getTargetObject(benefitService);
+        java.lang.reflect.Method method = service.getClass().getDeclaredMethod("downloadUrl", String.class);
+        method.setAccessible(true);
+        method.invoke(service, "promotion/uploads/0b1e2f3a-1111-2222-3333-444455556666/logo.svg");
+        var captor = org.mockito.ArgumentCaptor.forClass(GetObjectPresignRequest.class);
+        org.mockito.Mockito.verify(s3Presigner, org.mockito.Mockito.atLeastOnce()).presignGetObject(captor.capture());
+        var request = captor.getValue().getObjectRequest();
+        assertThat(request.responseContentDisposition()).isEqualTo("attachment; filename=\"logo.svg\"");
+        assertThat(request.responseContentType()).isEqualTo("application/octet-stream");
     }
 }

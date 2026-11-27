@@ -12,6 +12,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import com.likelion.chak.alert.PublicWriteLimiter;
+import com.likelion.chak.exception.CustomException;
+import com.likelion.chak.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -29,18 +32,21 @@ public class AuthController {
     private final AuthService authService;
     private final TokenService tokenService;
     private final RefreshCookieService refreshCookieService;
+    private final PublicWriteLimiter writeLimiter;
 
     @Operation(summary = "카카오 로그인", description = "프론트가 받은 카카오 인가 코드를 서비스 토큰으로 교환합니다. 리프레시 토큰은 HttpOnly 쿠키로도 내려갑니다.")
     @PostMapping("/kakao")
     public ResponseEntity<AuthTokenResponse> loginWithKakao(
-            @Valid @RequestBody OAuthLoginRequest request) {
+            @Valid @RequestBody OAuthLoginRequest request, HttpServletRequest http) {
+        limitLogin(http);
         return tokenResponse(authService.loginWithKakao(request));
     }
 
     @Operation(summary = "구글 로그인", description = "프론트가 받은 구글 인가 코드를 서비스 토큰으로 교환합니다. 리프레시 토큰은 HttpOnly 쿠키로도 내려갑니다.")
     @PostMapping("/google")
     public ResponseEntity<AuthTokenResponse> loginWithGoogle(
-            @Valid @RequestBody OAuthLoginRequest request) {
+            @Valid @RequestBody OAuthLoginRequest request, HttpServletRequest http) {
+        limitLogin(http);
         return tokenResponse(authService.loginWithGoogle(request));
     }
 
@@ -66,6 +72,13 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookieService.clearHeader())
                 .body(new MessageResponseBody("로그아웃되었습니다."));
+    }
+
+    /** 로그인은 로그인 없이 부르며 제공자 HTTP 호출을 일으키므로 접속자별로 횟수를 묶는다. */
+    private void limitLogin(HttpServletRequest http) {
+        if (!writeLimiter.tryAcquire(PublicWriteLimiter.Action.LOGIN, ClientIp.of(http))) {
+            throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
+        }
     }
 
     private ResponseEntity<AuthTokenResponse> tokenResponse(AuthTokenResponse tokens) {

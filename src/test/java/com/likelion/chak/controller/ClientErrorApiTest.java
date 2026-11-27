@@ -81,6 +81,8 @@ class ClientErrorApiTest {
     }
 
     @Test
+    // 이 테스트가 사용자 제보 알림 한도(분당)를 다 쓰므로, 같은 컨텍스트를 쓰는 다른 테스트에 남기지 않는다.
+    @org.springframework.test.annotation.DirtiesContext(methodMode = org.springframework.test.annotation.DirtiesContext.MethodMode.AFTER_METHOD)
     void oneClientCannotFloodTheEndpoint() throws Exception {
         String ip = uniqueIp();
         int accepted = 0;

@@ -63,6 +63,23 @@ class MediaServiceValidationTest {
     }
 
     @Test
+    void uploadsStopAtThePerUserQuota() {
+        MediaAssetRepository repository = mock(MediaAssetRepository.class);
+        MediaService service = new MediaService(repository, mock(S3Presigner.class), mock(S3Client.class));
+        ReflectionTestUtils.setField(service, "bucket", "test-bucket");
+        ReflectionTestUtils.setField(service, "presignExpirationSeconds", 600L);
+        UserAccount user = UserAccount.createKakao("media-quota", "사용자", null, null);
+        ReflectionTestUtils.setField(user, "id", 7L);
+        when(repository.sumExpectedSizeByOwnerId(7L)).thenReturn(MediaService.MAX_BYTES_PER_USER - 100);
+
+        assertThatThrownBy(() -> service.createUpload(user, new MediaPresignRequest(
+                MediaPurpose.CARD, "card.png", "image/png", 1000)))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.MEDIA_QUOTA_EXCEEDED);
+    }
+
+    @Test
     void completionMovesUploadAwayFromReusableTemporaryKey() {
         MediaAssetRepository repository = mock(MediaAssetRepository.class);
         S3Presigner presigner = mock(S3Presigner.class);

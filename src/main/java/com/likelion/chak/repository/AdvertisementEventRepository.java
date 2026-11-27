@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import com.likelion.chak.domain.AdEventType;
+import com.likelion.chak.domain.AdPlacement;
 
 public interface AdvertisementEventRepository extends JpaRepository<AdvertisementEvent, Long> {
 
@@ -23,6 +24,25 @@ public interface AdvertisementEventRepository extends JpaRepository<Advertisemen
     boolean existsByEventTypeAndSessionIdAndGuestId(AdEventType eventType, String sessionId, Long guestId);
 
     long countByUserIdAndCreatedAtGreaterThanEqual(Long userId, Instant createdAt);
+
+    long countByAdvertisementIdAndEventTypeAndUserIdAndCreatedAtGreaterThanEqual(
+            Long advertisementId, AdEventType eventType, Long userId, Instant createdAt);
+
+    long countByAdvertisementIdAndEventTypeAndGuestIdAndCreatedAtGreaterThanEqual(
+            Long advertisementId, AdEventType eventType, Long guestId, Instant createdAt);
+
+    boolean existsByAdvertisementIdAndEventTypeAndSessionIdAndUserId(
+            Long advertisementId, AdEventType eventType, String sessionId, Long userId);
+
+    boolean existsByAdvertisementIdAndEventTypeAndSessionIdAndGuestId(
+            Long advertisementId, AdEventType eventType, String sessionId, Long guestId);
+
+    /** 해제 광고(UNLOCK 자리) 한 회차의 시작·완료 기록. */
+    Optional<AdvertisementEvent> findFirstByEventTypeAndSessionIdAndUserIdAndAdvertisementPlacement(
+            AdEventType eventType, String sessionId, Long userId, AdPlacement placement);
+
+    Optional<AdvertisementEvent> findFirstByEventTypeAndSessionIdAndGuestIdAndAdvertisementPlacement(
+            AdEventType eventType, String sessionId, Long guestId, AdPlacement placement);
 
     long countByGuestIdAndCreatedAtGreaterThanEqual(Long guestId, Instant createdAt);
 

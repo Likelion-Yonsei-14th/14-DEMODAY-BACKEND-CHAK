@@ -91,6 +91,8 @@ class ExamCareerRunApiTest {
                 finished(id, 99, 2.0, "sky", "칭호"),
                 finished(id, 1, 2.0, "sky", "<script>"),
                 finished(id, 1, 2.0, "sky", ""),
+                finished(id, 1, 2.0, "sky", "아무렇게나 지은 칭호"),   // 프론트가 만들지 않는 칭호(집계 부풀리기)
+                finished(id, 1, 2.0, "sky", "99수의 전설"),
                 started("not-a-uuid"),
                 "{\"runId\":\"" + id + "\",\"track\":\"science\",\"finished\":true}");
         long before = count();

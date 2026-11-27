@@ -40,6 +40,7 @@ class PublicWriteLimitApiTest {
     @Autowired private UserAccountRepository userRepository;
     @Autowired private JwtTokenProvider jwt;
     @Autowired private ObjectMapper mapper;
+    @Autowired private com.likelion.chak.repository.GuestIdentityRepository guestRepository;
     @MockitoBean private AlertNotifier notifier;
 
     private PersonalDesk desk() {
@@ -152,5 +153,22 @@ class PublicWriteLimitApiTest {
         mockMvc.perform(post("/api/public/messages/" + messageId + "/report").header("X-Forwarded-For", reporter)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"스팸\"}"))
                 .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void cookielessReactionsToMissingMessagesStopCreatingGuestRows() throws Exception {
+        String ip = ip();
+        long before = guestRepository.count();
+        int limited = 0;
+        for (int i = 0; i < 40; i++) {
+            int code = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                            .put("/api/public/messages/999999999/reaction").header("X-Forwarded-For", ip)
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"HEART\"}"))
+                    .andReturn().getResponse().getStatus();
+            if (code == 429) limited++;
+        }
+        // 새 손님은 접속자당 분당 30명까지만 만든다. 그 뒤로는 실패할 요청이 손님 행을 남기지 않는다.
+        assertThat(guestRepository.count() - before).isLessThanOrEqualTo(30);
+        assertThat(limited).isGreaterThanOrEqualTo(10);
     }
 }

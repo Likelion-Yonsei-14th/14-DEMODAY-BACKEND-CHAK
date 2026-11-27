@@ -168,6 +168,13 @@ class DiscountAdApiTest {
     }
 
     @Test
+    void clicksWithoutAnImpressionAreNotCounted() throws Exception {
+        long ad = create("클릭만" + UUID.randomUUID().toString().substring(0, 6), "서울", true, "");
+        // 본 적 없이 바로 누른 클릭은 남기지 않는다(F19).
+        assertThat(event(ad, "CLICK", null).getResponse().getStatus()).isEqualTo(202);
+    }
+
+    @Test
     void coordinatesMustBeInKorea() throws Exception {
         mockMvc.perform(post("/api/admin/discounts").header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)

@@ -64,4 +64,24 @@ class DiscordAlertNotifierTest {
         assertThatThrownBy(() -> new DiscordAlertNotifier(RestClient.create(), "https://evil.example/hook", "prod"))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void userReportedTextIsShownAsCodeSoMarkdownLinksDoNotRender() {
+        AlertMessage reported = AlertMessage.builder("프론트", "화면 렌더링 오류", "fp2", AlertMessage.Severity.ERROR)
+                .description("[Payment outage: re-login](https://evil.example/login) ``` break")
+                .field("화면", "[click](https://evil.example)")
+                .userReported()
+                .build();
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> embed = ((java.util.List<java.util.Map<String, Object>>)
+                notifier.payload(reported, 0).get("embeds")).get(0);
+        String description = (String) embed.get("description");
+        org.assertj.core.api.Assertions.assertThat(description).startsWith("```\n").endsWith("\n```");
+        // 본문 안의 백틱으로 코드 블록을 닫고 나올 수 없다.
+        org.assertj.core.api.Assertions.assertThat(description.substring(3, description.length() - 3)).doesNotContain("`");
+        org.assertj.core.api.Assertions.assertThat((String) embed.get("title")).contains("사용자 제보(확인 안 됨)");
+        @SuppressWarnings("unchecked")
+        var fields = (java.util.List<java.util.Map<String, Object>>) embed.get("fields");
+        org.assertj.core.api.Assertions.assertThat((String) fields.get(0).get("value")).startsWith("`").endsWith("`");
+    }
 }

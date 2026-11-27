@@ -67,6 +67,19 @@ public interface MinigameRoundRepository extends JpaRepository<MinigameRound, Lo
             where r.game = :game and r.score is not null and r.submittedAt >= :since""")
     List<Object[]> submissionsSince(@Param("game") MinigameType game, @Param("since") Instant since);
 
+    /** 기간 안에 제출한 판 수(회원 또는 비회원). 어드민 통계가 행을 메모리로 읽지 않고 날짜별로 센다. */
+    @Query("""
+            select count(r) from MinigameRound r
+            where r.game = :game and r.score is not null and r.submittedAt >= :from and r.submittedAt < :to
+              and ((:member = true and r.user is not null) or (:member = false and r.user is null))""")
+    long countSubmittedBetween(@Param("game") MinigameType game, @Param("from") Instant from,
+                               @Param("to") Instant to, @Param("member") boolean member);
+
+    @Query("""
+            select coalesce(sum(r.score), 0) from MinigameRound r
+            where r.game = :game and r.score is not null and r.submittedAt >= :from""")
+    long sumScoreSince(@Param("game") MinigameType game, @Param("from") Instant from);
+
     long countByGameAndCreatedAtGreaterThanEqual(MinigameType game, Instant since);
 
     @Query("select count(distinct r.user.id) from MinigameRound r where r.game = :game and r.score is not null and r.user is not null")

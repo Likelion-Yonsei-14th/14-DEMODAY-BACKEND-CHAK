@@ -88,6 +88,24 @@ class ErrorAlertServiceTest {
     }
 
     @Test
+    void floodsOfUserReportedErrorsCannotUseUpTheServerAlertBudget() {
+        for (int i = 0; i < 100; i++) {
+            service.alert(AlertMessage.builder("프론트", "제보", "client|" + i, AlertMessage.Severity.ERROR)
+                    .userReported().build());
+        }
+        assertThat(sentFingerprints).hasSize(ErrorAlertService.MAX_USER_REPORTED_PER_MINUTE);
+
+        service.alert(message("server|payment-failed"));
+        assertThat(sentFingerprints).contains("server|payment-failed");
+    }
+
+    @Test
+    void logNotifierEscapesNewlinesSoUserTextCannotForgeLogLines() {
+        assertThat(LogAlertNotifier.oneLine("a\n2026-11-27 INFO forged\r\nb")).doesNotContain("\n").doesNotContain("\r")
+                .isEqualTo("a\\n2026-11-27 INFO forged\\r\\nb");
+    }
+
+    @Test
     void aFailingNotifierNeverBreaksTheCaller() {
         ErrorAlertService failing = new ErrorAlertService(
                 (m, s) -> {

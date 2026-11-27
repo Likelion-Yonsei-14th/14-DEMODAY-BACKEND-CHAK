@@ -20,6 +20,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 오늘의 찍신은 나야!: 정답을 서버가 정하고 제출된 답을 서버가 채점한다.
@@ -34,8 +36,15 @@ public class GuessGodService {
     static final Duration ROUND_TTL = Duration.ofHours(24);
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    /** 점수 분포는 전체 기간 GROUP BY라 요청마다 돌리지 않고 잠깐 보관한다(공개·무로그인 랭킹 조회와 제출이 함께 부른다). */
+    static final Duration DISTRIBUTION_CACHE = Duration.ofSeconds(30);
+
     private final MinigameRoundRepository roundRepository;
     private final MinigameRankingService ranking;
+    private final Map<Instant, CachedDistribution> distributionCache = new ConcurrentHashMap<>();
+
+    private record CachedDistribution(List<Long> counts, Instant until) {
+    }
 
     @Transactional
     public RoundCreated createRound() {
@@ -102,6 +111,20 @@ public class GuessGodService {
     }
 
     private List<Long> distribution(Instant since) {
+        Instant now = Instant.now();
+        CachedDistribution cached = distributionCache.get(since);
+        if (cached != null && cached.until().isAfter(now)) {
+            return cached.counts();
+        }
+        List<Long> fresh = loadDistribution(since);
+        if (distributionCache.size() > 8) {
+            distributionCache.entrySet().removeIf(e -> !e.getValue().until().isAfter(now));
+        }
+        distributionCache.put(since, new CachedDistribution(fresh, now.plus(DISTRIBUTION_CACHE)));
+        return fresh;
+    }
+
+    private List<Long> loadDistribution(Instant since) {
         long[] counts = new long[QUESTION_COUNT + 1];
         for (ScoreCount row : roundRepository.distribution(MinigameType.GUESS_GOD, since)) {
             if (row.getScore() >= 0 && row.getScore() <= QUESTION_COUNT) {
@@ -112,7 +135,7 @@ public class GuessGodService {
         for (long count : counts) {
             result.add(count);
         }
-        return result;
+        return List.copyOf(result);
     }
 
     private static void validate(List<Integer> answers) {

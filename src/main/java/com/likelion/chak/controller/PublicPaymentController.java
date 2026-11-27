@@ -52,7 +52,7 @@ public class PublicPaymentController {
         if (!writeLimiter.tryAcquire(PublicWriteLimiter.Action.ORDER, who)) {
             throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
         }
-        Writer writer = writer(principal, guestKey);
+        Writer writer = writer(principal, guestKey, http);
         OrderResponse response = paymentService.createOrder(writer.identity, request);
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.CREATED);
         GuestCookieService.addHeader(builder, writer.cookie);
@@ -86,19 +86,25 @@ public class PublicPaymentController {
     public ResponseEntity<UnlockResponse> unlock(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @CookieValue(name = "${chak.guest-cookie.name}", required = false) String guestKey,
-            @Valid @RequestBody UnlockRequest request) {
-        Writer writer = writer(principal, guestKey);
+            @Valid @RequestBody UnlockRequest request,
+            HttpServletRequest http) {
+        String who = principal != null ? "u" + principal.userId() : "ip" + ClientIp.of(http);
+        if (!writeLimiter.tryAcquire(PublicWriteLimiter.Action.UNLOCK, who)) {
+            throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
+        }
+        Writer writer = writer(principal, guestKey, http);
         UnlockResponse response = unlockService.unlock(writer.identity, request);
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.CREATED);
         GuestCookieService.addHeader(builder, writer.cookie);
         return builder.body(response);
     }
 
-    private Writer writer(AuthenticatedUser principal, String guestKey) {
+    /** 새 손님은 접속자별 생성 속도 안에서만 만든다(실패할 요청이 손님 행만 남기지 않게). */
+    private Writer writer(AuthenticatedUser principal, String guestKey, HttpServletRequest http) {
         if (principal != null) {
             return new Writer(identityService.resolve(principal, null), null);
         }
-        GuestSession session = guestCookieService.resolveOrCreate(guestKey);
+        GuestSession session = guestCookieService.resolveOrCreateLimited(guestKey, ClientIp.of(http));
         return new Writer(new CallerIdentity(null, session.getGuestIdentity()),
                 guestCookieService.cookieHeaderIfCreated(session));
     }
