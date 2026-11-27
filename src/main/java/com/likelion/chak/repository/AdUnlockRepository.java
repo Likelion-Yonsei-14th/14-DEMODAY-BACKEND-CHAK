@@ -15,4 +15,8 @@ public interface AdUnlockRepository extends JpaRepository<AdUnlock, Long> {
     boolean existsByUserIdAndCategoryAndAssetId(Long userId, UnlockCategory category, String assetId);
 
     boolean existsByGuestIdAndCategoryAndAssetId(Long guestId, UnlockCategory category, String assetId);
+
+    boolean existsByUserIdAndAdSessionId(Long userId, String adSessionId);
+
+    boolean existsByGuestIdAndAdSessionId(Long guestId, String adSessionId);
 }

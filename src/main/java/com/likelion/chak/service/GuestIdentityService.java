@@ -46,6 +46,24 @@ public class GuestIdentityService {
         return createGuestSession();
     }
 
+    /**
+     * 읽기 요청용. 이미 있는 손님은 돌려주고, 새 손님은 생성 속도 안에서만 만든다. 넘으면 예외 대신 null을 돌려
+     * 화면은 그대로 보여 주되 손님 행은 늘리지 않는다.
+     */
+    @Transactional
+    public GuestSession resolveOrCreateIfAllowed(String guestKey, String clientIp) {
+        if (guestKey != null && !guestKey.isBlank()) {
+            var existing = guestIdentityRepository.findByGuestKey(guestKey);
+            if (existing.isPresent()) {
+                return new GuestSession(existing.get(), false);
+            }
+        }
+        if (!creationLimiter.tryAcquire(clientIp)) {
+            return null;
+        }
+        return createGuestSession();
+    }
+
     private GuestSession createGuestSession() {
         GuestIdentity guest = guestIdentityRepository.save(GuestIdentity.create());
         return new GuestSession(guest, true);

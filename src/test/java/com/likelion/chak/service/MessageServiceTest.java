@@ -221,7 +221,7 @@ class MessageServiceTest {
         UserAccount member = userAccountRepository.save(UserAccount.createKakao("limits-member", "회원", null, null));
 
         messageService.createUserMessage(desk.getSupporterToken(), member,
-                requestWithPage(elements(10), elements(10)));
+                requestWithPage(elements(10), photos(10)));
 
         for (String page : List.of(
                 "{\"stickerElements\": " + elements(11) + "}",
@@ -240,7 +240,7 @@ class MessageServiceTest {
     void guestCannotAttachPhotosButMemberCan() {
         PersonalDesk desk = createDesk(Instant.parse("2026-01-01T00:00:00Z"));
         GuestSession guestSession = guestIdentityService.resolveOrCreate(null);
-        String withPhoto = "{\"photoElements\": [{\"id\": \"p\", \"src\": \"x\"}]}";
+        String withPhoto = "{\"photoElements\": [{\"id\": \"p\", \"src\": \"data:image/webp;base64,UklGRg==\"}]}";
 
         assertThatThrownBy(() -> messageService.createGuestMessage(
                 desk.getSupporterToken(), guestSession.getGuestIdentity(), requestWithRawPage(withPhoto)))
@@ -254,6 +254,46 @@ class MessageServiceTest {
 
         UserAccount member = userAccountRepository.save(UserAccount.createKakao("member-photo", "회원", null, null));
         messageService.createUserMessage(desk.getSupporterToken(), member, requestWithRawPage(withPhoto));
+    }
+
+    @Test
+    void memberCardPhotosMustBeInlineImagesNotRemoteUrls() {
+        PersonalDesk desk = createDesk(Instant.parse("2026-01-01T00:00:00Z"));
+        UserAccount member = userAccountRepository.save(UserAccount.createKakao("member-remote-photo", "회원", null, null));
+        for (String src : List.of("https://attacker.example/pixel.png?m=1", "//attacker.example/p.png",
+                "data:image/svg+xml;base64,PHN2Zz4=", "javascript:alert(1)")) {
+            String page = "{\"photoElements\": [{\"id\": \"p\", \"src\": \"" + src + "\"}]}";
+            assertThatThrownBy(() -> messageService.createUserMessage(
+                    desk.getSupporterToken(), member, requestWithRawPage(page)))
+                    .isInstanceOf(CustomException.class)
+                    .extracting(exception -> ((CustomException) exception).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_CARD_PAYLOAD);
+        }
+    }
+
+    @Test
+    void oversizedObjectMetadataIsRefused() {
+        PersonalDesk desk = createDesk(Instant.parse("2026-01-01T00:00:00Z"));
+        GuestSession guestSession = guestIdentityService.resolveOrCreate(null);
+        String big = "x".repeat(MessageService.MAX_OBJECT_METADATA_LENGTH + 1);
+        GuestMessageCreateRequest request = objectMapper.readValue("""
+                {
+                  "nickname": "친구", "kind": "CARD", "visibility": "PUBLIC", "schemaVersion": 1,
+                  "card": {"pages": [{}]},
+                  "object": {"representationType": "LETTER", "x": 50, "y": 50, "rotation": 0, "scale": 1, "zIndex": 1,
+                             "metadata": {"pad": "%s"}}
+                }
+                """.formatted(big), GuestMessageCreateRequest.class);
+        assertThatThrownBy(() -> messageService.createGuestMessage(
+                desk.getSupporterToken(), guestSession.getGuestIdentity(), request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_DESK_OBJECT);
+    }
+
+    private String photos(int count) {
+        return "[" + String.join(",", java.util.Collections.nCopies(count,
+                "{\"id\": \"p\", \"src\": \"data:image/jpeg;base64,/9j/4AAQ\"}")) + "]";
     }
 
     private String elements(int count) {

@@ -47,6 +47,16 @@ class PaymentServiceTest {
     @Autowired private GuestIdentityService guestIdentityService;
     @Autowired private UserAccountRepository userAccountRepository;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    @Autowired private jakarta.persistence.EntityManager entityManager;
+
+    /** 광고 시청 시작 시각을 10초 앞으로 당긴다(5초 광고를 다 본 것처럼). */
+    private void backdateStart(String sessionId) {
+        entityManager.flush();
+        jdbcTemplate.update("update advertisement_events set created_at = ? where session_id = ? and event_type = 'VIEW_STARTED'",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(10)), sessionId);
+        entityManager.clear();
+    }
 
     private CallerIdentity guest() {
         return new CallerIdentity(null, guestIdentityService.resolveOrCreate(null).getGuestIdentity());
@@ -73,6 +83,26 @@ class PaymentServiceTest {
                  "object": {"representationType": "CHARM", "x": 50, "y": 50, "rotation": 0, "scale": 1, "zIndex": 1,
                             "metadata": {"material": "acrylic", "gems": [{"id": "a"}, {"id": "b"}, {"id": "c"}]}}}
                 """.formatted(orderId), GuestMessageCreateRequest.class);
+    }
+
+    @Test
+    void universityCharmIsChargedByItsAssetIdWhateverTheMetadataSays() {
+        PersonalDesk desk = desk("payment-university");
+        CallerIdentity friend = guest();
+        String body = """
+                {"nickname": "친구", "kind": "CARD", "visibility": "PUBLIC", "schemaVersion": 1,
+                 "card": {"pages": [{"id": "p1"}]},
+                 "paymentOrderId": %s,
+                 "object": {"representationType": "CHARM", "assetId": "uni-yonsei-jersey",
+                            "x": 50, "y": 50, "rotation": 0, "scale": 1, "zIndex": 1, "metadata": {}}}
+                """;
+        assertThatThrownBy(() -> messageService.createGuestMessage(desk.getSupporterToken(), friend.guest(),
+                objectMapper.readValue(body.formatted("null"), GuestMessageCreateRequest.class)))
+                .extracting(e -> ((CustomException) e).getErrorCode()).isEqualTo(ErrorCode.PAYMENT_REQUIRED);
+
+        OrderResponse paid = paidOrder(friend, new OrderItemRequest(ProductCode.UNIVERSITY_CHARM, null, 1));
+        messageService.createGuestMessage(desk.getSupporterToken(), friend.guest(),
+                objectMapper.readValue(body.formatted(paid.orderId()), GuestMessageCreateRequest.class));
     }
 
     @Test
@@ -161,9 +191,25 @@ class PaymentServiceTest {
         assertThatThrownBy(() -> unlockService.unlock(friend, request))
                 .extracting(e -> ((CustomException) e).getErrorCode()).isEqualTo(ErrorCode.AD_NOT_COMPLETED);
 
+        // 완료만 보내는 것(시작 기록 없음)은 받지 않는다.
+        assertThatThrownBy(() -> advertisementService.recordEvent(ad.id(), null, friend.guest(),
+                new AdvertisementEventRequest(AdEventType.VIEW_COMPLETED, "ad-session-1", 5000L)))
+                .extracting(e -> ((CustomException) e).getErrorCode()).isEqualTo(ErrorCode.INVALID_ANALYTICS_EVENT);
+
+        advertisementService.recordEvent(ad.id(), null, friend.guest(),
+                new AdvertisementEventRequest(AdEventType.VIEW_STARTED, "ad-session-1", null));
         advertisementService.recordEvent(ad.id(), null, friend.guest(),
                 new AdvertisementEventRequest(AdEventType.VIEW_COMPLETED, "ad-session-1", 5000L));
+        // 시작 직후 완료: 광고 길이만큼 지나지 않았으므로 아직 해제하지 않는다.
+        assertThatThrownBy(() -> unlockService.unlock(friend, request))
+                .extracting(e -> ((CustomException) e).getErrorCode()).isEqualTo(ErrorCode.AD_NOT_COMPLETED);
+
+        backdateStart("ad-session-1");
         assertThat(unlockService.unlock(friend, request).assetId()).isEqualTo("clip-01");
+
+        // 한 번 본 광고로 다른 소품까지 해제할 수는 없다.
+        assertThatThrownBy(() -> unlockService.unlock(friend, new UnlockRequest(UnlockCategory.DECOR, "clip-03", "ad-session-1")))
+                .extracting(e -> ((CustomException) e).getErrorCode()).isEqualTo(ErrorCode.AD_NOT_COMPLETED);
 
         // 다른 사람의 시청 기록으로는 해제할 수 없다.
         assertThatThrownBy(() -> unlockService.unlock(guest(), new UnlockRequest(UnlockCategory.DECOR, "clip-02", "ad-session-1")))

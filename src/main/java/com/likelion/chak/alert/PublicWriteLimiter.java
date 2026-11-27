@@ -39,6 +39,10 @@ public class PublicWriteLimiter {
         DESK_MESSAGE_HOUR(300, HOUR_MS),
         DESK_MESSAGE_DAY(1_500, DAY_MS),
         REPORT(30, HOUR_MS),
+        /** 편지 반응(하트 등): 같은 접속자가 시간당 300번. 공개 목록을 훑으며 누르는 사람도 넉넉하다. */
+        REACTION(300, HOUR_MS),
+        /** 광고 보고 해제: 같은 접속자가 시간당 60번. */
+        UNLOCK(60, HOUR_MS),
         ORDER(20, HOUR_MS),
         /** 프로필 이름·사진 변경: 회원 한 명이 시간당 20번. */
         PROFILE_UPDATE(20, HOUR_MS),

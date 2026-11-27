@@ -33,6 +33,11 @@ public class GuestCookieService {
         return guestIdentityService.resolveOrCreate(guestKey);
     }
 
+    /** 새 비회원을 만들어야 할 때만 접속자별 생성 속도를 확인한다(넘으면 429). 손님 행을 무한정 만드는 남용 방지. */
+    public GuestSession resolveOrCreateLimited(String guestKey, String clientIp) {
+        return guestIdentityService.resolveOrCreateLimited(guestKey, clientIp);
+    }
+
     /** 새로 만든 비회원이면 Set-Cookie 헤더 값을, 아니면 null을 반환한다. */
     public String cookieHeaderIfCreated(GuestSession session) {
         if (session == null || !session.isCreated()) {

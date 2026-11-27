@@ -94,10 +94,14 @@ class AdDeliveryApiTest {
 
     /** 노출을 남기고, 손님 쿠키를 돌려준다(처음이면 새로 받는다). */
     private Cookie impression(long adId, String type, Cookie guest, String regionCode) throws Exception {
+        return event(adId, type, guest, regionCode, UUID.randomUUID().toString());
+    }
+
+    private Cookie event(long adId, String type, Cookie guest, String regionCode, String sessionId) throws Exception {
         MockHttpServletRequestBuilder req = post("/api/public/ads/" + adId + "/events")
                 .header("X-Forwarded-For", "10.9." + (int) (Math.random() * 250) + "." + (int) (Math.random() * 250))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"eventType\":\"" + type + "\",\"sessionId\":\"" + UUID.randomUUID() + "\"}");
+                .content("{\"eventType\":\"" + type + "\",\"sessionId\":\"" + sessionId + "\"}");
         if (regionCode != null) {
             req = req.header("X-Vercel-IP-Country", "KR").header("X-Vercel-IP-Country-Region", regionCode);
         }
@@ -212,8 +216,8 @@ class AdDeliveryApiTest {
         long a = createAd("A", null);
         Cookie first = impression(a, "IMPRESSION", null, "11");
         impression(a, "IMPRESSION", first, "11"); // 같은 사람 두 번
-        Cookie second = impression(a, "IMPRESSION", null, "26");
-        impression(a, "CLICK", second, "26");
+        Cookie second = event(a, "IMPRESSION", null, "26", "shown-once");
+        event(a, "CLICK", second, "26", "shown-once");   // 클릭은 같은 회차 노출 뒤에만 받는다
 
         JsonNode report = mapper.readTree(mockMvc.perform(get("/api/admin/ads/" + a + "/report").header("Authorization", admin))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
@@ -244,5 +248,29 @@ class AdDeliveryApiTest {
         mockMvc.perform(post("/api/admin/ads").header("Authorization", admin)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void clicksNeedAnImpressionOfTheSameSessionAndAreCappedPerViewer() throws Exception {
+        long a = createAd("Capped", null);
+        // 노출 없이 바로 클릭만 보내면 거절한다.
+        mockMvc.perform(post("/api/public/ads/" + a + "/events").header("X-Forwarded-For", "10.8.0.1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"eventType\":\"CLICK\",\"sessionId\":\"never-shown\"}"))
+                .andExpect(status().isBadRequest());
+
+        // 한 사람이 sessionId만 바꿔 노출을 부풀려도 하루 상한에서 멈춘다.
+        Cookie viewer = impression(a, "IMPRESSION", null, null);
+        int accepted = 1;
+        int refused = 0;
+        for (int i = 0; i < 40; i++) {
+            int code = mockMvc.perform(post("/api/public/ads/" + a + "/events").header("X-Forwarded-For", "10.8.0.2")
+                            .cookie(viewer).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"eventType\":\"IMPRESSION\",\"sessionId\":\"" + UUID.randomUUID() + "\"}"))
+                    .andReturn().getResponse().getStatus();
+            if (code == 201) accepted++; else if (code == 429) refused++;
+        }
+        assertThat(accepted).isEqualTo(30);
+        assertThat(refused).isEqualTo(11);
     }
 }
