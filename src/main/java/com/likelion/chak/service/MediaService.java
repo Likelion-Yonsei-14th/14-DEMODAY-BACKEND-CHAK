@@ -47,6 +47,11 @@ public class MediaService {
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "image/jpeg", "image/png", "image/webp", "image/gif");
 
+    /** 회원 한 명이 가질 수 있는 이미지 수·총 용량, 완료하지 않은(PENDING) 업로드 수. 저장소를 무료 파일 호스팅으로 쓰지 못하게 한다. */
+    static final long MAX_ASSETS_PER_USER = 300;
+    static final long MAX_BYTES_PER_USER = 300L * 1024 * 1024;
+    static final long MAX_PENDING_PER_USER = 20;
+
     private final MediaAssetRepository mediaAssetRepository;
     private final S3Presigner s3Presigner;
     private final S3Client s3Client;
@@ -61,6 +66,7 @@ public class MediaService {
     public MediaPresignResponse createUpload(UserAccount owner, MediaPresignRequest request) {
         validateConfiguration();
         validateRequest(request);
+        enforceQuota(owner.getId(), request.size());
 
         String objectKey = createTemporaryObjectKey(owner.getId(), request.purpose(), request.contentType());
         MediaAsset asset = mediaAssetRepository.save(MediaAsset.pending(
@@ -96,6 +102,14 @@ public class MediaService {
                 "PUT",
                 Map.of("Content-Type", request.contentType()),
                 Instant.now().plus(duration));
+    }
+
+    private void enforceQuota(Long ownerId, long size) {
+        if (mediaAssetRepository.countByOwnerIdAndStatus(ownerId, MediaStatus.PENDING) >= MAX_PENDING_PER_USER
+                || mediaAssetRepository.countByOwnerId(ownerId) >= MAX_ASSETS_PER_USER
+                || mediaAssetRepository.sumExpectedSizeByOwnerId(ownerId) + size > MAX_BYTES_PER_USER) {
+            throw new CustomException(ErrorCode.MEDIA_QUOTA_EXCEEDED);
+        }
     }
 
     @Transactional

@@ -39,6 +39,8 @@ public class PublicWriteLimiter {
         DESK_MESSAGE_HOUR(300, HOUR_MS),
         DESK_MESSAGE_DAY(1_500, DAY_MS),
         REPORT(30, HOUR_MS),
+        /** 이미지 업로드 주소 발급: 회원 한 명이 시간당 30번. */
+        MEDIA_PRESIGN(30, HOUR_MS),
         /** 소셜 로그인 시도: 같은 접속자가 시간당 300번. 한 교실이 같은 와이파이로 로그인해도 넉넉하다. */
         LOGIN(300, HOUR_MS),
         /** 편지 반응(하트 등): 같은 접속자가 시간당 300번. 공개 목록을 훑으며 누르는 사람도 넉넉하다. */

@@ -129,6 +129,13 @@ Resources:
             Status: Enabled
             Prefix: tmp/
             ExpirationInDays: 1
+          - Id: expire-unsubmitted-benefit-uploads
+            Status: Enabled
+            Prefix: promotion/uploads/
+            TagFilters:
+              - Key: chak-pending
+                Value: '1'
+            ExpirationInDays: 1
           - Id: expire-benefit-uploads
             Status: Enabled
             Prefix: promotion/uploads/
@@ -161,7 +168,9 @@ Resources:
                   - !Ref AppSecret
                   - !GetAtt Database.MasterUserSecret.SecretArn
               - Effect: Allow
-                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+                # *ObjectTagging: benefit uploads carry a chak-pending tag until a submission references them
+                # (PROMOTION_PENDING_UPLOAD_TAG=true), so unreferenced anonymous uploads expire after 1 day.
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject, s3:PutObjectTagging, s3:DeleteObjectTagging]
                 Resource: !Sub '${MediaBucket.Arn}/*'
 
   InstanceProfile:

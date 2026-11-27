@@ -21,6 +21,11 @@ public interface DiscountEventRepository extends JpaRepository<DiscountEvent, Lo
     boolean existsByViewerSince(@Param("discountId") Long discountId, @Param("type") DiscountEvent.Type type,
                                 @Param("userId") Long userId, @Param("guestId") Long guestId, @Param("since") Instant since);
 
+    @Query("select count(e) from DiscountEvent e where e.discountId = :discountId and e.eventType = :type "
+            + "and (e.userId = :userId or e.guestId = :guestId) and e.createdAt >= :since")
+    long countByViewerSince(@Param("discountId") Long discountId, @Param("type") DiscountEvent.Type type,
+                            @Param("userId") Long userId, @Param("guestId") Long guestId, @Param("since") Instant since);
+
     /** 집계용 원자료: 혜택·종류·사람·시각. */
     @Query("select e.discountId, e.eventType, e.userId, e.guestId, e.createdAt from DiscountEvent e where e.createdAt >= :from and e.createdAt < :to")
     List<Object[]> findRows(@Param("from") Instant from, @Param("to") Instant to);

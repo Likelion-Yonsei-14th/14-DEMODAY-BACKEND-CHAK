@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectTaggingRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -64,6 +65,11 @@ public class BenefitSubmissionService {
             Map.entry("xls", "application/vnd.ms-excel"));
     private static final Set<String> LOGO_EXTENSIONS = Set.of("png", "jpg", "jpeg", "svg", "webp", "pdf", "ai", "eps", "zip");
     private static final Set<String> SHEET_EXTENSIONS = Set.of("csv", "xlsx", "xls");
+    /** 브라우저가 문서로 열어도 스크립트가 돌지 않는 그림 형식. 이 밖의 파일(SVG 포함)은 내려받기 전용 형식으로 내준다. */
+    private static final Set<String> RASTER_EXTENSIONS = Set.of("png", "jpg", "jpeg", "webp");
+    /** 신청서에 연결되지 않은 업로드를 1일 만에 지우는 S3 수명 주기 규칙이 보는 태그. 신청서를 받으면 태그를 지운다. */
+    static final String PENDING_TAG_KEY = "chak-pending";
+    static final String PENDING_TAG = PENDING_TAG_KEY + "=1";
 
     private final BenefitSubmissionRepository repository;
     private final BenefitAnswerValidator validator;
@@ -79,6 +85,13 @@ public class BenefitSubmissionService {
 
     @Value("${storage.presign-expiration-seconds}")
     private long presignExpirationSeconds;
+
+    /**
+     * 켜면 업로드에 대기 태그를 달아(서명된 x-amz-tagging 헤더) 신청서에 연결되지 않은 파일이 수명 주기 규칙으로 1일 뒤 지워진다.
+     * 서버 역할에 s3:PutObjectTagging·s3:DeleteObjectTagging 권한과 태그 기반 수명 주기 규칙(chak-stack.yaml)이 먼저 있어야 한다.
+     */
+    @Value("${chak.promotion.pending-upload-tag:false}")
+    private boolean pendingUploadTag;
 
     /** 올릴 파일 한 개의 주소를 발급한다. 파일은 신청서를 보낼 때 키로 연결된다. */
     public UploadResponse createUpload(UploadRequest request) {
@@ -101,10 +114,14 @@ public class BenefitSubmissionService {
                                     .key(key)
                                     .contentType(contentType)
                                     .contentLength(request.size())
+                                    .tagging(pendingUploadTag ? PENDING_TAG : null)
                                     .build())
                             .build())
                     .url().toExternalForm();
-            return new UploadResponse(key, url, "PUT", Map.of("Content-Type", contentType), Instant.now().plus(duration));
+            Map<String, String> headers = pendingUploadTag
+                    ? Map.of("Content-Type", contentType, "x-amz-tagging", PENDING_TAG)
+                    : Map.of("Content-Type", contentType);
+            return new UploadResponse(key, url, "PUT", headers, Instant.now().plus(duration));
         } catch (SdkException e) {
             throw new CustomException(ErrorCode.STORAGE_API_ERROR);
         }
@@ -124,6 +141,12 @@ public class BenefitSubmissionService {
             String key = answers.path(field).asString("");
             if (!key.isEmpty() && !objectExists(key)) {
                 throw new CustomException(ErrorCode.INVALID_BENEFIT_ANSWER);
+            }
+        }
+        for (String field : BenefitAnswerValidator.fileFields()) {
+            String key = answers.path(field).asString("");
+            if (!key.isEmpty()) {
+                keepUpload(key);
             }
         }
         String email = answers.path("email").asString().toLowerCase(Locale.ROOT);
@@ -204,14 +227,38 @@ public class BenefitSubmissionService {
         }
     }
 
+    /** 신청서에 연결된 파일은 대기 태그를 지워 1일 수명 주기 규칙에서 빼낸다. */
+    private void keepUpload(String key) {
+        if (!pendingUploadTag || bucket.isBlank()) {
+            return;
+        }
+        try {
+            s3Client.deleteObjectTagging(DeleteObjectTaggingRequest.builder().bucket(bucket).key(key).build());
+        } catch (SdkException e) {
+            throw new CustomException(ErrorCode.STORAGE_API_ERROR);
+        }
+    }
+
+    /**
+     * 누구나 올린 파일을 운영자가 여는 주소. 항상 내려받기(attachment)로 내주고, 래스터 그림이 아니면 형식도
+     * application/octet-stream으로 바꿔 SVG·HTML 같은 파일이 버킷 출처에서 문서로 열려 스크립트가 도는 것을 막는다.
+     * 래스터 그림은 원래 형식을 유지해 어드민 화면의 &lt;img&gt; 미리보기는 그대로 된다.
+     */
     private String downloadUrl(String key) {
         if (bucket.isBlank()) {
             return "";
         }
+        String fileName = key.substring(key.lastIndexOf('/') + 1);
+        String extension = extensionOf(fileName);
+        GetObjectRequest.Builder get = GetObjectRequest.builder().bucket(bucket).key(key)
+                .responseContentDisposition("attachment; filename=\"" + fileName.replaceAll("[^A-Za-z0-9._-]", "_") + "\"");
+        if (!RASTER_EXTENSIONS.contains(extension)) {
+            get.responseContentType("application/octet-stream");
+        }
         try {
             return s3Presigner.presignGetObject(GetObjectPresignRequest.builder()
                             .signatureDuration(Duration.ofSeconds(presignExpirationSeconds))
-                            .getObjectRequest(GetObjectRequest.builder().bucket(bucket).key(key).build())
+                            .getObjectRequest(get.build())
                             .build())
                     .url().toExternalForm();
         } catch (SdkException e) {

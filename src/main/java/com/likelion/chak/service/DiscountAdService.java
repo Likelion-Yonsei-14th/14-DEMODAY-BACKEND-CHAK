@@ -49,6 +49,10 @@ public class DiscountAdService {
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final Duration COUNT_REFRESH = Duration.ofSeconds(30);
     private static final Duration IMPRESSION_WINDOW = Duration.ofMinutes(30);
+
+    /** 한 사람이 한 혜택에 하루 남길 수 있는 노출·클릭 수. */
+    static final long MAX_IMPRESSIONS_PER_VIEWER_PER_DAY = 20;
+    static final long MAX_CLICKS_PER_VIEWER_PER_DAY = 5;
     private static final Duration CLICK_WINDOW = Duration.ofSeconds(5);
     private static final String NATIONWIDE = "전국";
 
@@ -114,13 +118,26 @@ public class DiscountAdService {
         if (discount == null || !discount.isSponsored() || !discount.isVisible()) {
             return false;
         }
-        if (userId != null || guestId != null) {
-            Duration window = type == DiscountEvent.Type.IMPRESSION ? IMPRESSION_WINDOW : CLICK_WINDOW;
-            boolean duplicate = eventRepository.existsByViewerSince(discountId, type,
-                    userId != null ? userId : -1L, userId != null ? -1L : guestId, Instant.now().minus(window));
-            if (duplicate) {
-                return false;
-            }
+        if (userId == null && guestId == null) {
+            return false;   // 누가 보냈는지 모르는 기록은 중복을 거를 수 없어 남기지 않는다
+        }
+        Long viewerUser = userId != null ? userId : -1L;
+        Long viewerGuest = userId != null ? -1L : guestId;
+        Instant now = Instant.now();
+        Duration window = type == DiscountEvent.Type.IMPRESSION ? IMPRESSION_WINDOW : CLICK_WINDOW;
+        if (eventRepository.existsByViewerSince(discountId, type, viewerUser, viewerGuest, now.minus(window))) {
+            return false;
+        }
+        // 한 사람이 한 혜택에 하루 남길 수 있는 기록 수를 묶고, 클릭은 하루 안에 본(노출) 적이 있어야 센다.
+        // 제휴 혜택 노출 순서와 제휴사 통계가 이 기록으로 정해지므로 쿠키 하나로 부풀리지 못하게 한다.
+        Instant dayAgo = now.minus(Duration.ofDays(1));
+        long cap = type == DiscountEvent.Type.IMPRESSION ? MAX_IMPRESSIONS_PER_VIEWER_PER_DAY : MAX_CLICKS_PER_VIEWER_PER_DAY;
+        if (eventRepository.countByViewerSince(discountId, type, viewerUser, viewerGuest, dayAgo) >= cap) {
+            return false;
+        }
+        if (type == DiscountEvent.Type.CLICK && !eventRepository.existsByViewerSince(
+                discountId, DiscountEvent.Type.IMPRESSION, viewerUser, viewerGuest, dayAgo)) {
+            return false;
         }
         eventRepository.save(new DiscountEvent(discountId, type, placement, userId, guestId, region));
         return true;

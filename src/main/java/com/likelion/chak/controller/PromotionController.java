@@ -42,7 +42,7 @@ public class PromotionController {
     /** 제휴 업체가 /promotion/apply의 혜택 시안 신청서에서 올릴 파일(로고·코드 목록·매장 목록)의 주소를 받는다. */
     @PostMapping("/benefit-uploads")
     public ResponseEntity<BenefitDtos.UploadResponse> upload(@Valid @RequestBody BenefitDtos.UploadRequest request, HttpServletRequest http) {
-        if (!uploadRateLimiter.tryAcquire(ClientIp.of(http))) {
+        if (!uploadRateLimiter.tryAcquire(ClientIp.of(http), Math.max(0, request.size()))) {
             throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
         }
         return ResponseEntity.status(HttpStatus.CREATED).body(benefitService.createUpload(request));

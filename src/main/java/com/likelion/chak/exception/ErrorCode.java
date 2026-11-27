@@ -64,6 +64,7 @@ public enum ErrorCode {
     MESSAGE_LOCKED(HttpStatus.CONFLICT, "MESSAGE_LOCKED", "아직 열어볼 수 없는 편지입니다."),
     MEDIA_NOT_FOUND(HttpStatus.NOT_FOUND, "MEDIA_NOT_FOUND", "업로드 자산을 찾을 수 없습니다."),
     INVALID_MEDIA(HttpStatus.BAD_REQUEST, "INVALID_MEDIA", "업로드할 이미지 정보가 올바르지 않습니다."),
+    MEDIA_QUOTA_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "MEDIA_QUOTA_EXCEEDED", "올릴 수 있는 이미지 수나 용량을 넘었습니다."),
     MEDIA_UPLOAD_NOT_FOUND(HttpStatus.CONFLICT, "MEDIA_UPLOAD_NOT_FOUND", "Object Storage에서 업로드 파일을 확인할 수 없습니다."),
     STORAGE_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "STORAGE_NOT_CONFIGURED", "Object Storage 설정이 필요합니다."),
     STORAGE_API_ERROR(HttpStatus.BAD_GATEWAY, "STORAGE_API_ERROR", "Object Storage와 통신하지 못했습니다."),

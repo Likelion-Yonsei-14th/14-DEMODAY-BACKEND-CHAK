@@ -11,6 +11,9 @@ import com.likelion.chak.service.MediaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
+import com.likelion.chak.alert.PublicWriteLimiter;
+import com.likelion.chak.exception.CustomException;
+import com.likelion.chak.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,12 +33,16 @@ public class MediaController {
 
     private final AuthService authService;
     private final MediaService mediaService;
+    private final PublicWriteLimiter writeLimiter;
 
     @Operation(summary = "이미지 업로드 URL 발급")
     @PostMapping("/presign")
     public ResponseEntity<MediaPresignResponse> presign(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @Valid @RequestBody MediaPresignRequest request) {
+        if (!writeLimiter.tryAcquire(PublicWriteLimiter.Action.MEDIA_PRESIGN, "u" + principal.userId())) {
+            throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
+        }
         UserAccount user = authService.getUser(principal.userId());
         return ResponseEntity.status(HttpStatus.CREATED).body(mediaService.createUpload(user, request));
     }
