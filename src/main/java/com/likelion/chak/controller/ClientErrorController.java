@@ -31,7 +31,7 @@ public class ClientErrorController {
     public ResponseEntity<Void> report(
             @Valid @RequestBody ClientErrorRequest request, HttpServletRequest http) {
         String userAgent = http.getHeader("User-Agent");
-        if (!rateLimiter.tryAcquire(clientIp(http), userAgent)) {
+        if (!rateLimiter.tryAcquire(ClientIp.of(http), userAgent)) {
             throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
         }
 
@@ -69,14 +69,5 @@ public class ClientErrorController {
         boolean serverSide = request.status() != null && request.status() >= 500;
         return serverSide || "render_error".equals(request.kind())
                 ? AlertMessage.Severity.ERROR : AlertMessage.Severity.WARN;
-    }
-
-    /** Vercel·CloudFront 뒤에서는 가장 왼쪽 X-Forwarded-For가 실제 접속자다. 제한용으로만 쓰고 저장하지 않는다. */
-    private static String clientIp(HttpServletRequest http) {
-        String forwarded = http.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return http.getRemoteAddr();
     }
 }

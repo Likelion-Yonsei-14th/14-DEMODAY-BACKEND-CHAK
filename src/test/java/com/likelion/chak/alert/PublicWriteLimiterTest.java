@@ -48,4 +48,17 @@ class PublicWriteLimiterTest {
         for (int i = 0; i < 90; i++) assertThat(limiter.tryAcquire(Action.GUEST_MESSAGE_IP, "ip")).isTrue();
         assertThat(limiter.tryAcquire(Action.GUEST_MESSAGE_IP, "ip")).isFalse();
     }
+
+    @Test
+    void aFullKeyTableEvictsTheOldestKeyInsteadOfRefusingNewVisitors() {
+        var limiter = new PublicWriteLimiter(clock, 1);
+        for (int i = 0; i < 300; i++) limiter.record(Action.DESK_MESSAGE_HOUR, "desk-a");
+        for (int i = 0; i < PublicWriteLimiter.MAX_KEYS_PER_ACTION + 100; i++) {
+            assertThat(limiter.tryAcquire(Action.GUEST_MESSAGE_IP, "10.0." + (i / 250) + "." + (i % 250))).isTrue();
+        }
+        assertThat(limiter.tryAcquire(Action.GUEST_MESSAGE_IP, "203.0.113.7")).isTrue();   // 처음 온 손님도 막히지 않는다
+        assertThat(limiter.tryAcquire(Action.ORDER, "u1")).isTrue();
+        // IP 키를 아무리 채워도 책상별 상한 기록은 다른 표라 지워지지 않는다.
+        assertThat(limiter.allows(Action.DESK_MESSAGE_HOUR, "desk-a")).isFalse();
+    }
 }

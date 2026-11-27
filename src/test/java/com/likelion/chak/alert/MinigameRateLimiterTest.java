@@ -31,4 +31,14 @@ class MinigameRateLimiterTest {
         now.addAndGet(600_001);
         assertThat(limiter.tryAcquire(Action.STUDY_TYPE_RESULT, "a")).isTrue();
     }
+
+    @Test
+    void aFullKeyTableEvictsTheOldestKeyInsteadOfRefusingNewClients() {
+        var limiter = new MinigameRateLimiter(clock);
+        for (int i = 0; i < MinigameRateLimiter.MAX_KEYS_PER_ACTION + 100; i++) {
+            assertThat(limiter.tryAcquire(Action.DESK_BLAST_ROUND, "spoofed-" + i)).isTrue();
+        }
+        assertThat(limiter.tryAcquire(Action.DESK_BLAST_ROUND, "u42")).isTrue();       // 처음 온 회원도 막히지 않는다
+        assertThat(limiter.tryAcquire(Action.POLL_VOTE, "u42")).isTrue();              // 다른 종류의 표는 영향이 없다
+    }
 }

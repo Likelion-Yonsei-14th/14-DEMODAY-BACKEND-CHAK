@@ -8,13 +8,14 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.HexFormat;
 import java.util.Map;
 
 /**
  * 미니게임 남용 방지. 한 접속자(회원 번호 또는 IP 해시)가 정해진 시간 안에 할 수 있는 횟수를 제한한다.
- * 기록은 창이 지나면 버리고, 접속자 수가 너무 많아지면 새 접속자를 거절해 메모리를 지킨다.
+ * 기록은 창이 지나면 버린다. 키 표는 종류별로 따로 두고, 가득 차면 가장 오래 쓰이지 않은 키를 버린다(LRU).
+ * 예전처럼 새 접속자를 거절하면 위조한 키로 표를 채운 사람 하나 때문에 처음 오는 모든 사람이 막혔다.
  */
 @Component
 public class MinigameRateLimiter {
@@ -43,10 +44,11 @@ public class MinigameRateLimiter {
         }
     }
 
-    private static final int MAX_KEYS = 20_000;
+    /** 종류별 키 표 크기. 넘치면 가장 오래 쓰이지 않은 키부터 버린다. */
+    static final int MAX_KEYS_PER_ACTION = 20_000;
 
     private final Clock clock;
-    private final Map<String, Deque<Long>> hits = new HashMap<>();
+    private final Map<Action, Map<String, Deque<Long>>> hits = new EnumMap<>(Action.class);
 
     public MinigameRateLimiter() {
         this(Clock.systemUTC());
@@ -58,14 +60,9 @@ public class MinigameRateLimiter {
 
     public synchronized boolean tryAcquire(Action action, String who) {
         long now = clock.millis();
-        String key = action.name() + ":" + hash(who);
-        if (hits.size() >= MAX_KEYS && !hits.containsKey(key)) {
-            hits.values().removeIf(q -> q.isEmpty() || now - q.peekLast() >= 3_600_000L);
-            if (hits.size() >= MAX_KEYS) {
-                return false;
-            }
-        }
-        Deque<Long> queue = hits.computeIfAbsent(key, k -> new ArrayDeque<>());
+        Map<String, Deque<Long>> table =
+                hits.computeIfAbsent(action, a -> PublicWriteLimiter.lruTable(MAX_KEYS_PER_ACTION));
+        Deque<Long> queue = table.computeIfAbsent(hash(who), k -> new ArrayDeque<>());
         while (!queue.isEmpty() && now - queue.peekFirst() >= action.windowMs) {
             queue.pollFirst();
         }
