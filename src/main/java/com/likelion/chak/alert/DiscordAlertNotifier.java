@@ -72,11 +72,12 @@ public class DiscordAlertNotifier implements AlertNotifier {
     }
 
     Map<String, Object> payload(AlertMessage message, int suppressedSinceLast) {
+        boolean untrusted = message.userReported();
         List<Map<String, Object>> fields = new ArrayList<>();
         message.fields().forEach((name, value) -> {
             Map<String, Object> field = new LinkedHashMap<>();
             field.put("name", AlertSanitizer.truncate(name, 256));
-            field.put("value", AlertSanitizer.truncate(value, 1000));
+            field.put("value", untrusted ? inlineCode(AlertSanitizer.truncate(value, 990)) : AlertSanitizer.truncate(value, 1000));
             field.put("inline", value.length() <= 40);
             fields.add(field);
         });
@@ -89,8 +90,11 @@ public class DiscordAlertNotifier implements AlertNotifier {
         }
 
         Map<String, Object> embed = new LinkedHashMap<>();
-        embed.put("title", AlertSanitizer.truncate("[" + environment + "] " + message.source() + " · " + message.title(), 250));
-        embed.put("description", AlertSanitizer.truncate(message.description(), 3500));
+        String label = untrusted ? " · 사용자 제보(확인 안 됨)" : "";
+        embed.put("title", AlertSanitizer.truncate("[" + environment + "] " + message.source() + " · " + message.title() + label, 250));
+        embed.put("description", untrusted
+                ? codeBlock(AlertSanitizer.truncate(message.description(), 3400))
+                : AlertSanitizer.truncate(message.description(), 3500));
         embed.put("color", message.severity() == AlertMessage.Severity.ERROR ? COLOR_ERROR : COLOR_WARN);
         embed.put("fields", fields.size() > 25 ? fields.subList(0, 25) : fields);
         embed.put("timestamp", Instant.now().toString());
@@ -100,5 +104,27 @@ public class DiscordAlertNotifier implements AlertNotifier {
         body.put("allowed_mentions", Map.of("parse", List.of()));
         body.put("embeds", List.of(embed));
         return body;
+    }
+
+    /**
+     * 사용자가 보낸 글은 코드 블록 안에 넣는다. 디스코드는 코드 안의 마크다운·[글](링크)를 그리지 않으므로
+     * 그럴듯한 피싱 링크가 운영 알림 안에서 눌리는 링크로 보이지 않는다. 백틱은 비슷한 글자로 바꿔 블록을 못 닫게 한다.
+     */
+    static String codeBlock(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return "```\n" + neutralizeBackticks(value) + "\n```";
+    }
+
+    static String inlineCode(String value) {
+        if (value == null || value.isBlank()) {
+            return "-";
+        }
+        return "`" + neutralizeBackticks(value).replace("\n", " ") + "`";
+    }
+
+    private static String neutralizeBackticks(String value) {
+        return value.replace('`', 'ˋ');
     }
 }

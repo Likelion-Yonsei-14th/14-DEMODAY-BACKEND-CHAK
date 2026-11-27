@@ -51,6 +51,7 @@ public class ClientErrorController {
                 .field("빌드", AlertSanitizer.clean(request.buildId(), 40))
                 .field("접수 코드", AlertSanitizer.clean(request.reportId(), 40))
                 .field("스택", AlertSanitizer.clean(request.stack(), 700))
+                .userReported()
                 .build());
         return ResponseEntity.status(HttpStatus.ACCEPTED).build();
     }

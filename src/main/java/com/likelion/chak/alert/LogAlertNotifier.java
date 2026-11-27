@@ -14,6 +14,16 @@ public class LogAlertNotifier implements AlertNotifier {
 
     @Override
     public void notify(AlertMessage message, int suppressedSinceLast) {
-        log.warn("ALERT [{}] {} {} (추가 발생 {}회)", message.source(), message.title(), message.fields(), suppressedSinceLast);
+        log.warn("ALERT [{}] {} {} (추가 발생 {}회)", oneLine(message.source()), oneLine(message.title()),
+                oneLine(String.valueOf(message.fields())), suppressedSinceLast);
+    }
+
+    /** 줄바꿈을 보이는 글자로 바꿔, 사용자 입력이 가짜 로그 줄을 만들지 못하게 한다(로그 위조 방지). */
+    static String oneLine(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n")
+                .replace("\u2028", "\\u2028").replace("\u2029", "\\u2029");
     }
 }
