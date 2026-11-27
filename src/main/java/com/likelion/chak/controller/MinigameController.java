@@ -73,16 +73,20 @@ public class MinigameController {
             @PathVariable String roundId,
             @Valid @RequestBody SubmitRequest request,
             @AuthenticationPrincipal AuthenticatedUser principal) {
+        if (principal != null && !rateLimiter.tryAcquire(Action.GUESS_GOD_MEMBER_SUBMIT, "u" + principal.userId())) {
+            throw new CustomException(ErrorCode.TOO_MANY_EVENTS);
+        }
         return ResponseEntity.ok(guessGodService.submit(roundId, request.answers(), viewer(principal)));
     }
 
     @GetMapping("/guess-god/leaderboard")
     public ResponseEntity<Leaderboard> leaderboard(
             @RequestParam(defaultValue = "daily") String period,
-            @AuthenticationPrincipal AuthenticatedUser principal) {
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest http) {
         if (!"daily".equals(period) && !"overall".equals(period)) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
+        limit(Action.LEADERBOARD, principal, http);
         return ResponseEntity.ok(guessGodService.leaderboard(period, viewer(principal)));
     }
 
@@ -104,10 +108,11 @@ public class MinigameController {
     @GetMapping("/sneaky-phone/leaderboard")
     public ResponseEntity<SneakyPhoneBoard> sneakyPhoneLeaderboard(
             @RequestParam(defaultValue = "daily") String period,
-            @AuthenticationPrincipal AuthenticatedUser principal) {
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest http) {
         if (!"daily".equals(period) && !"overall".equals(period)) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
+        limit(Action.LEADERBOARD, principal, http);
         return ResponseEntity.ok(sneakyPhoneService.leaderboard(period, viewer(principal)));
     }
 
@@ -129,10 +134,11 @@ public class MinigameController {
     @GetMapping("/desk-blast/leaderboard")
     public ResponseEntity<SneakyPhoneBoard> deskBlastLeaderboard(
             @RequestParam(defaultValue = "daily") String period,
-            @AuthenticationPrincipal AuthenticatedUser principal) {
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest http) {
         if (!"daily".equals(period) && !"overall".equals(period)) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
+        limit(Action.LEADERBOARD, principal, http);
         return ResponseEntity.ok(deskBlastService.leaderboard(period, viewer(principal)));
     }
 
