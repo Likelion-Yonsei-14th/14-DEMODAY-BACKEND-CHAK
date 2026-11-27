@@ -8,10 +8,13 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
+
+import java.time.Duration;
 
 @Component
 public class KakaoClient implements OAuthClient {
@@ -27,7 +30,11 @@ public class KakaoClient implements OAuthClient {
             @Value("${kakao.client-secret:}") String clientSecret,
             @Value("${kakao.token-uri}") String tokenUri,
             @Value("${kakao.user-info-uri}") String userInfoUri) {
-        this.restClient = RestClient.create();
+        // 제공자가 느리면 로그인 요청 스레드가 하염없이 기다리지 않게 연결·응답 시간을 묶는다(GoogleClient와 같은 값).
+        SimpleClientHttpRequestFactory timeouts = new SimpleClientHttpRequestFactory();
+        timeouts.setConnectTimeout(Duration.ofSeconds(3));
+        timeouts.setReadTimeout(Duration.ofSeconds(10));
+        this.restClient = RestClient.builder().requestFactory(timeouts).build();
         this.clientId = clientId;
         this.clientSecret = clientSecret;
         this.tokenUri = tokenUri;
