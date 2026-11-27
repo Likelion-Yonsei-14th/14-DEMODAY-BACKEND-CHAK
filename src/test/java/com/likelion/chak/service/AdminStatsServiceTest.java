@@ -92,11 +92,11 @@ class AdminStatsServiceTest {
         long beforeGuests = statsService.daily(today, today).days().get(0).guestVisitors();
         long beforeSeoul = statsService.regions(today, today).items().stream()
                 .filter(item -> "11".equals(item.region())).mapToLong(item -> item.visitors()).sum();
-        GuestIdentity sharedGuest = guest();
+        UserAccount tester = userRepository.save(UserAccount.create(AuthProvider.TEST, "loadtest:" + UUID.randomUUID(), "부하시험", null, null));
         for (int i = 0; i < 2; i++) {
             var visit = new TrafficEventRequest(UUID.randomUUID().toString(), TrafficEventType.PAGE_VIEW,
                     "load-test-guest-" + i, "/", null, "LOAD_TEST_GUEST", null, null);
-            analyticsService.record(null, sharedGuest, visit, new AnalyticsService.Geo("KR", "11"));
+            analyticsService.record(tester, null, visit, new AnalyticsService.Geo("KR", "11"));
         }
         assertThat(statsService.daily(today, today).days().get(0).guestVisitors()).isEqualTo(beforeGuests + 2);
         long afterSeoul = statsService.regions(today, today).items().stream()
@@ -113,7 +113,7 @@ class AdminStatsServiceTest {
         analyticsService.record(natural, null, pageView("/"));
         analyticsService.record(test, null, pageView("/"));
         analyticsService.record(null, guest(), pageView("/"));
-        analyticsService.record(null, guest(), new TrafficEventRequest(UUID.randomUUID().toString(),
+        analyticsService.record(test, null, new TrafficEventRequest(UUID.randomUUID().toString(),
                 TrafficEventType.PAGE_VIEW, "test-session", "/", null, "LOAD_TEST_GUEST", null, null));
         var after = statsService.naturalDaily(today);
         assertThat(after.members()).isEqualTo(before.members() + 1);
@@ -239,13 +239,26 @@ class AdminStatsServiceTest {
         assertThat(after.rangeVisitors() - before.rangeVisitors()).isEqualTo(2);
 
         // 부하 테스트 방문도 대시보드 접속자와 같이 방문마다 한 명으로 센다.
-        GuestIdentity shared = guest();
+        UserAccount tester = userRepository.save(UserAccount.create(AuthProvider.TEST, "loadtest:" + UUID.randomUUID(), "부하시험", null, null));
         for (int i = 0; i < 2; i++) {
-            analyticsService.record(null, shared, new TrafficEventRequest(UUID.randomUUID().toString(), TrafficEventType.PAGE_VIEW,
+            analyticsService.record(tester, null, new TrafficEventRequest(UUID.randomUUID().toString(), TrafficEventType.PAGE_VIEW,
                     "load-" + i, "/", null, "LOAD_TEST_GUEST", null, null));
         }
         var withLoad = statsService.active(today, today).days().get(0);
         assertThat(withLoad.dau() - day.dau()).isEqualTo(2);
         assertThat(withLoad.dau()).isEqualTo(statsService.daily(today, today).days().get(0).visitors());
+    }
+
+    @Test
+    void aGuestCannotForgeLoadTestVisitsToInflatePublicVisitorCounts() {
+        LocalDate today = LocalDate.now(AdminStatsService.KST);
+        long before = statsService.daily(today, today).days().get(0).visitors();
+        GuestIdentity forger = guest();
+        for (int i = 0; i < 5; i++) {
+            analyticsService.record(null, forger, new TrafficEventRequest(UUID.randomUUID().toString(),
+                    TrafficEventType.PAGE_VIEW, "forged-" + i, "/", null, "LOAD_TEST_GUEST", null, null));
+        }
+        // 비회원 한 명은 한 명으로만 센다.
+        assertThat(statsService.daily(today, today).days().get(0).visitors()).isEqualTo(before + 1);
     }
 }

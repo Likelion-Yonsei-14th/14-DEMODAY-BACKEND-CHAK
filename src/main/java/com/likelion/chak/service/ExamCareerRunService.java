@@ -23,6 +23,20 @@ import java.util.Set;
 public class ExamCareerRunService {
 
     public static final Set<String> TRACKS = Set.of("humanities", "science");
+    /** 프론트(examCareerTitle.ts)가 만드는 칭호. 자유 입력을 받으면 어드민 통계의 칭호별 집계가 끝없이 늘어난다. */
+    public static final Set<String> TITLES = Set.of(
+            "현역 SKY 신화", "역전의 명수", "다시 일어선 도전자", "현역 에이스", "한 과목 장인", "극단의 줄타기",
+            "자유로운 영혼", "끈기의 재도전러", "버티기 달인", "꾸준한 정석 수험생");
+    /** "N수의 전설"(N = 재수 횟수 + 1). 가능한 N은 몇 개뿐이라 집계가 늘어나지 않는다. */
+    private static final java.util.regex.Pattern LEGEND_TITLE = java.util.regex.Pattern.compile("^([0-9]{1,2})수의 전설$");
+
+    static boolean isKnownTitle(String title) {
+        if (title == null) return false;
+        if (TITLES.contains(title)) return true;
+        var legend = LEGEND_TITLE.matcher(title);
+        return legend.matches() && Integer.parseInt(legend.group(1)) >= 2 && Integer.parseInt(legend.group(1)) <= MAX_ATTEMPT + 1;
+    }
+
     public static final Set<String> ENROLLED = Set.of("sky", "seoul-upper", "seoul-lower", "regional", "provincial", "college", "none");
     static final int MAX_ATTEMPT = 20;
 
@@ -63,7 +77,7 @@ public class ExamCareerRunService {
             ok = ok && request.attempt() != null && request.attempt() <= MAX_ATTEMPT
                     && request.finalAverage() != null && request.finalAverage() >= 1 && request.finalAverage() <= 9
                     && request.enrolled() != null && ENROLLED.contains(request.enrolled())
-                    && request.title() != null && !request.title().isBlank();
+                    && isKnownTitle(request.title());
         }
         if (!ok) {
             throw new CustomException(ErrorCode.INVALID_EXAM_CAREER_RUN);

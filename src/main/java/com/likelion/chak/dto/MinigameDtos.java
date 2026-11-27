@@ -135,7 +135,7 @@ public final class MinigameDtos {
             @Min(0) @Max(20) Integer attempt,
             @DecimalMin("1.0") @DecimalMax("9.0") Double finalAverage,
             @Size(max = 20) String enrolled,
-            @Size(max = 30) @Pattern(regexp = "^[가-힣0-9 ]*$") String title) {
+            @Size(max = 30) @Pattern(regexp = "^[가-힣A-Za-z0-9 ]*$") String title) {
     }
 
     public record ExamCareerRunReceived(boolean received) {

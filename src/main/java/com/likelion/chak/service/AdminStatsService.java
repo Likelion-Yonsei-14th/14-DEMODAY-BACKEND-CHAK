@@ -219,9 +219,9 @@ public class AdminStatsService {
         return instant.atZone(KST).toLocalDate();
     }
 
+    /** 부하 시험 계정(TEST)이 남긴 표시만 믿는다. 비회원이 붙인 표시는 AnalyticsService가 지우지만, 예전 행도 여기서 거른다. */
     private static boolean isLoadTestGuest(Object[] row) {
-        return "LOAD_TEST_GUEST".equals(row[5])
-                && (row[1] == null || row[7] == AuthProvider.TEST);
+        return "LOAD_TEST_GUEST".equals(row[5]) && row[7] == AuthProvider.TEST;
     }
 
     private static Map<LocalDate, Long> countByDay(List<Instant> instants) {

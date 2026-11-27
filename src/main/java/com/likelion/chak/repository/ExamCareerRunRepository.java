@@ -36,7 +36,11 @@ public interface ExamCareerRunRepository extends JpaRepository<ExamCareerRun, Lo
     @Query("select avg(r.finalAverage) from ExamCareerRun r where r.finished = true")
     Double averageFinalGrade();
 
-    /** (시작 시각, 끝났는지, 마지막 갱신 시각)만 읽어 날짜별로 자바에서 센다. */
+    long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(Instant from, Instant to);
+
+    long countByFinishedTrueAndUpdatedAtGreaterThanEqualAndUpdatedAtLessThan(Instant from, Instant to);
+
+    /** (시작 시각, 끝났는지, 마지막 갱신 시각). 어드민 통계는 이제 날짜별 count 쿼리를 쓰고 이 메서드는 쓰지 않는다. */
     @Query("select r.createdAt, r.finished, r.updatedAt from ExamCareerRun r where r.createdAt >= :since")
     List<Object[]> runsSince(@Param("since") Instant since);
 }

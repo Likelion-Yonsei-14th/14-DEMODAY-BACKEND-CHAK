@@ -1,5 +1,7 @@
 package com.likelion.chak.service;
 
+import com.likelion.chak.domain.AuthProvider;
+
 import com.likelion.chak.domain.GuestIdentity;
 import com.likelion.chak.domain.TrafficEvent;
 import com.likelion.chak.domain.TrafficEventType;
@@ -78,7 +80,7 @@ public class AnalyticsService {
                 normalize(request.sessionId()),
                 normalize(request.path()),
                 normalize(request.referrer()),
-                normalize(request.resourceType()),
+                resourceTypeFor(user, request.resourceType()),
                 normalize(request.resourceKey()),
                 metadata,
                 geo == null ? null : geo.country(),
@@ -134,6 +136,19 @@ public class AnalyticsService {
             result.put(row[0].toString(), (Long) row[1]);
         }
         return result;
+    }
+
+    /**
+     * LOAD_TEST_*는 부하 시험 방문 표시라 통계에서 방문마다 한 명으로 센다. 누구나 붙이면 공개 방문자 수를 부풀릴 수 있으므로
+     * 부하 시험 계정(TEST, 발급에 운영 키가 필요)이 보낸 것만 남기고 나머지는 표시를 지운다.
+     */
+    private String resourceTypeFor(UserAccount user, String resourceType) {
+        String normalized = normalize(resourceType);
+        if (normalized != null && normalized.startsWith("LOAD_TEST_")
+                && (user == null || user.getProvider() != AuthProvider.TEST)) {
+            return null;
+        }
+        return normalized;
     }
 
     private String normalize(String value) {

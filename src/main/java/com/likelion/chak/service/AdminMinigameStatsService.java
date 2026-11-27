@@ -24,7 +24,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 어드민 미니게임 참여 통계. 날짜는 한국 시간 기준이고, 규모가 작아 행을 읽어 자바에서 집계한다. */
+/** 어드민 미니게임 참여 통계. 날짜는 한국 시간 기준이고, 행을 메모리로 읽지 않고 날짜별 count 쿼리로 센다. */
 @Service
 @RequiredArgsConstructor
 public class AdminMinigameStatsService {
@@ -51,23 +51,18 @@ public class AdminMinigameStatsService {
     private MinigameGameStats game(MinigameType game, LocalDate today) {
         Instant todayStart = today.atStartOfDay(KST).toInstant();
         LocalDate firstDay = today.minusDays(DAYS - 1);
-        List<Object[]> rows = roundRepository.submissionsSince(game, firstDay.atStartOfDay(KST).toInstant());
-
+        // 행을 메모리로 읽지 않고 날짜별 count로 센다(익명 사용자가 늘릴 수 있는 표라 행 수에 상한이 없다).
         long[] members = new long[DAYS];
         long[] guests = new long[DAYS];
-        long scoreSum = 0;
-        for (Object[] row : rows) {
-            int index = (int) java.time.temporal.ChronoUnit.DAYS.between(firstDay, ((Instant) row[0]).atZone(KST).toLocalDate());
-            if (index < 0 || index >= DAYS) {
-                continue;
-            }
-            if (row[2] == null) {
-                guests[index]++;
-            } else {
-                members[index]++;
-            }
-            scoreSum += ((Number) row[1]).longValue();
+        long total = 0;
+        for (int i = 0; i < DAYS; i++) {
+            Instant from = firstDay.plusDays(i).atStartOfDay(KST).toInstant();
+            Instant to = firstDay.plusDays(i + 1L).atStartOfDay(KST).toInstant();
+            members[i] = roundRepository.countSubmittedBetween(game, from, to, true);
+            guests[i] = roundRepository.countSubmittedBetween(game, from, to, false);
+            total += members[i] + guests[i];
         }
+        long scoreSum = total == 0 ? 0 : roundRepository.sumScoreSince(game, firstDay.atStartOfDay(KST).toInstant());
         List<MinigameDay> days = new ArrayList<>();
         long last7 = 0;
         for (int i = 0; i < DAYS; i++) {
@@ -77,7 +72,6 @@ public class AdminMinigameStatsService {
             }
         }
         long submittedToday = members[DAYS - 1] + guests[DAYS - 1];
-        long total = rows.size();
         return new MinigameGameStats(
                 game.name(),
                 roundRepository.countByGameAndCreatedAtGreaterThanEqual(game, todayStart),
@@ -129,18 +123,12 @@ public class AdminMinigameStatsService {
         LocalDate firstDay = today.minusDays(DAYS - 1);
         long[] started = new long[DAYS];
         long[] finished = new long[DAYS];
-        for (Object[] row : examCareerRepository.runsSince(firstDay.atStartOfDay(KST).toInstant())) {
-            int index = (int) java.time.temporal.ChronoUnit.DAYS.between(firstDay, ((Instant) row[0]).atZone(KST).toLocalDate());
-            if (index >= 0 && index < DAYS) {
-                started[index]++;
-            }
-            if ((boolean) row[1]) {
-                // 끝난 날은 결과를 받은 시각(마지막 갱신)으로 센다.
-                int doneIndex = (int) java.time.temporal.ChronoUnit.DAYS.between(firstDay, ((Instant) row[2]).atZone(KST).toLocalDate());
-                if (doneIndex >= 0 && doneIndex < DAYS) {
-                    finished[doneIndex]++;
-                }
-            }
+        for (int i = 0; i < DAYS; i++) {
+            Instant from = firstDay.plusDays(i).atStartOfDay(KST).toInstant();
+            Instant to = firstDay.plusDays(i + 1L).atStartOfDay(KST).toInstant();
+            started[i] = examCareerRepository.countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(from, to);
+            // 끝난 날은 결과를 받은 시각(마지막 갱신)으로 센다.
+            finished[i] = examCareerRepository.countByFinishedTrueAndUpdatedAtGreaterThanEqualAndUpdatedAtLessThan(from, to);
         }
         List<ExamCareerDay> days = new ArrayList<>();
         long startedLast7 = 0;
